@@ -1,0 +1,3551 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "6b665056",
+   "metadata": {
+    "id": "xNunVRJmVJbn",
+    "papermill": {
+     "duration": 0.014059,
+     "end_time": "2024-09-20T07:33:26.954976",
+     "exception": false,
+     "start_time": "2024-09-20T07:33:26.940917",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "[![Roboflow Notebooks](https://media.roboflow.com/notebooks/template/bannertest2-2.png?ik-sdk-version=javascript-1.4.3&updatedAt=1672932710194)](https://github.com/roboflow/notebooks)\n",
+    "\n",
+    "# How to Train YOLO-NAS on Custom Dataset\n",
+    "\n",
+    "This notebook is based on official [YOLO-NAS Notebook](https://colab.research.google.com/drive/1q0RmeVRzLwRXW-h9dPFSOchwJkThUy6d?usp=sharing) by DECI AI.\n",
+    "\n",
+    "![YOLO-NAS on RF100](https://raw.githubusercontent.com/Deci-AI/super-gradients/master/documentation/source/images/yolo_nas_rf100.png)\n",
+    "\n",
+    "## ⚠️ Disclaimer\n",
+    "\n",
+    "YOLO-NAS is still very fresh. If you notice that our notebook behaves incorrectly - especially if you experience errors that prevent you from going through the tutorial - don't hesitate! Let us know and open an [issue](https://github.com/roboflow/notebooks/issues) on the Roboflow Notebooks repository.\n",
+    "\n",
+    "## Pro Tip: Use GPU Acceleration\n",
+    "\n",
+    "If you are running this notebook in Google Colab, navigate to `Edit` -> `Notebook settings` -> `Hardware accelerator`, set it to `GPU`, and then click `Save`. This will ensure your notebook uses a GPU, which will significantly speed up model training times.\n",
+    "\n",
+    "## Steps in this Tutorial\n",
+    "\n",
+    "In this tutorial, we are going to cover:\n",
+    "\n",
+    "- Before you start\n",
+    "- Install YOLO-NAS\n",
+    "- Inference with pre-trained COCO model\n",
+    "- Finding open source datasets\n",
+    "- ⭐️ Training YOLO-NAS on your custom dataset ⭐️\n",
+    "- Load trained model\n",
+    "- Evaluate trained model\n",
+    "- Inference with trained model\n",
+    "\n",
+    "## 🔥 Let's begin!"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "42586b59",
+   "metadata": {
+    "id": "PllIOGAeajhc",
+    "papermill": {
+     "duration": 0.012206,
+     "end_time": "2024-09-20T07:33:26.980057",
+     "exception": false,
+     "start_time": "2024-09-20T07:33:26.967851",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## ⚡ Before you start\n",
+    "\n",
+    "Let's make sure that we have access to GPU. We can use `nvidia-smi` command to do that. In case of any problems navigate to `Edit` -> `Notebook settings` -> `Hardware accelerator`, set it to `GPU`, and then click `Save`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "74586354",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:33:27.006609Z",
+     "iopub.status.busy": "2024-09-20T07:33:27.006299Z",
+     "iopub.status.idle": "2024-09-20T07:33:28.142065Z",
+     "shell.execute_reply": "2024-09-20T07:33:28.140962Z"
+    },
+    "id": "H0760HRgZPMN",
+    "outputId": "79a82d7f-2f64-46cb-a2ef-a93d79934b45",
+    "papermill": {
+     "duration": 1.15164,
+     "end_time": "2024-09-20T07:33:28.144341",
+     "exception": false,
+     "start_time": "2024-09-20T07:33:26.992701",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fri Sep 20 07:33:27 2024       \r\n",
+      "+-----------------------------------------------------------------------------------------+\r\n",
+      "| NVIDIA-SMI 550.90.07              Driver Version: 550.90.07      CUDA Version: 12.4     |\r\n",
+      "|-----------------------------------------+------------------------+----------------------+\r\n",
+      "| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\r\n",
+      "| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\r\n",
+      "|                                         |                        |               MIG M. |\r\n",
+      "|=========================================+========================+======================|\r\n",
+      "|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\r\n",
+      "| N/A   42C    P8              9W /   70W |       1MiB /  15360MiB |      0%      Default |\r\n",
+      "|                                         |                        |                  N/A |\r\n",
+      "+-----------------------------------------+------------------------+----------------------+\r\n",
+      "|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\r\n",
+      "| N/A   38C    P8              9W /   70W |       1MiB /  15360MiB |      0%      Default |\r\n",
+      "|                                         |                        |                  N/A |\r\n",
+      "+-----------------------------------------+------------------------+----------------------+\r\n",
+      "                                                                                         \r\n",
+      "+-----------------------------------------------------------------------------------------+\r\n",
+      "| Processes:                                                                              |\r\n",
+      "|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |\r\n",
+      "|        ID   ID                                                               Usage      |\r\n",
+      "|=========================================================================================|\r\n",
+      "|  No running processes found                                                             |\r\n",
+      "+-----------------------------------------------------------------------------------------+\r\n"
+     ]
+    }
+   ],
+   "source": [
+    "!nvidia-smi"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c2b73687",
+   "metadata": {
+    "id": "lkYPlZfsbZT0",
+    "papermill": {
+     "duration": 0.012916,
+     "end_time": "2024-09-20T07:33:28.170356",
+     "exception": false,
+     "start_time": "2024-09-20T07:33:28.157440",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Install YOLO-NAS\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "82ebb501",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:33:28.197786Z",
+     "iopub.status.busy": "2024-09-20T07:33:28.197346Z",
+     "iopub.status.idle": "2024-09-20T07:35:48.814186Z",
+     "shell.execute_reply": "2024-09-20T07:35:48.813153Z"
+    },
+    "id": "SdQ5JGblbJTk",
+    "papermill": {
+     "duration": 140.633438,
+     "end_time": "2024-09-20T07:35:48.816508",
+     "exception": false,
+     "start_time": "2024-09-20T07:33:28.183070",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\r\n",
+      "cudf 24.8.2 requires cubinlinker, which is not installed.\r\n",
+      "cudf 24.8.2 requires cupy-cuda11x>=12.0.0, which is not installed.\r\n",
+      "cudf 24.8.2 requires ptxcompiler, which is not installed.\r\n",
+      "cuml 24.8.0 requires cupy-cuda11x>=12.0.0, which is not installed.\r\n",
+      "dask-cudf 24.8.2 requires cupy-cuda11x>=12.0.0, which is not installed.\r\n",
+      "ucxx 0.39.1 requires libucx>=1.15.0, which is not installed.\r\n",
+      "aiobotocore 2.13.2 requires botocore<1.34.132,>=1.34.70, but you have botocore 1.29.165 which is incompatible.\r\n",
+      "albucore 0.0.13 requires numpy<2,>=1.24.4, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "apache-beam 2.46.0 requires cloudpickle~=2.2.1, but you have cloudpickle 3.0.0 which is incompatible.\r\n",
+      "apache-beam 2.46.0 requires dill<0.3.2,>=0.3.1.1, but you have dill 0.3.8 which is incompatible.\r\n",
+      "apache-beam 2.46.0 requires pyarrow<10.0.0,>=3.0.0, but you have pyarrow 16.1.0 which is incompatible.\r\n",
+      "bayesian-optimization 1.5.1 requires numpy>=1.25, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "chex 0.1.86 requires numpy>=1.24.1, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "cudf 24.8.2 requires cuda-python<12.0a0,>=11.7.1, but you have cuda-python 12.6.0 which is incompatible.\r\n",
+      "featuretools 1.31.0 requires numpy>=1.25.0, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "ibis-framework 7.1.0 requires pyarrow<15,>=2, but you have pyarrow 16.1.0 which is incompatible.\r\n",
+      "libpysal 4.9.2 requires packaging>=22, but you have packaging 21.3 which is incompatible.\r\n",
+      "libpysal 4.9.2 requires shapely>=2.0.1, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "momepy 0.7.2 requires shapely>=2, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "osmnx 1.9.4 requires shapely<2.1,>=2.0, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "pointpats 2.5.0 requires numpy>=1.24, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "pointpats 2.5.0 requires shapely>=2, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "pyldavis 3.4.1 requires numpy>=1.24.2, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "rmm 24.8.2 requires cuda-python<12.0a0,>=11.7.1, but you have cuda-python 12.6.0 which is incompatible.\r\n",
+      "spaghetti 1.7.6 requires shapely>=2.0.1, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "spopt 0.6.1 requires shapely>=2.0.1, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "tensorflow 2.16.1 requires numpy<2.0.0,>=1.23.5; python_version <= \"3.11\", but you have numpy 1.23.0 which is incompatible.\r\n",
+      "tsfresh 0.20.3 requires scipy>=1.14.0; python_version >= \"3.10\", but you have scipy 1.13.1 which is incompatible.\r\n",
+      "woodwork 0.31.0 requires numpy>=1.25.0, but you have numpy 1.23.0 which is incompatible.\r\n",
+      "xarray 2024.7.0 requires packaging>=23.1, but you have packaging 21.3 which is incompatible.\u001b[0m\u001b[31m\r\n",
+      "\u001b[0m\u001b[31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.\r\n",
+      "cudf 24.8.2 requires cubinlinker, which is not installed.\r\n",
+      "cudf 24.8.2 requires cupy-cuda11x>=12.0.0, which is not installed.\r\n",
+      "cudf 24.8.2 requires ptxcompiler, which is not installed.\r\n",
+      "cuml 24.8.0 requires cupy-cuda11x>=12.0.0, which is not installed.\r\n",
+      "dask-cudf 24.8.2 requires cupy-cuda11x>=12.0.0, which is not installed.\r\n",
+      "ucxx 0.39.1 requires libucx>=1.15.0, which is not installed.\r\n",
+      "apache-beam 2.46.0 requires cloudpickle~=2.2.1, but you have cloudpickle 3.0.0 which is incompatible.\r\n",
+      "apache-beam 2.46.0 requires dill<0.3.2,>=0.3.1.1, but you have dill 0.3.8 which is incompatible.\r\n",
+      "apache-beam 2.46.0 requires numpy<1.25.0,>=1.14.3, but you have numpy 1.26.4 which is incompatible.\r\n",
+      "apache-beam 2.46.0 requires pyarrow<10.0.0,>=3.0.0, but you have pyarrow 16.1.0 which is incompatible.\r\n",
+      "cudf 24.8.2 requires cuda-python<12.0a0,>=11.7.1, but you have cuda-python 12.6.0 which is incompatible.\r\n",
+      "ibis-framework 7.1.0 requires pyarrow<15,>=2, but you have pyarrow 16.1.0 which is incompatible.\r\n",
+      "libpysal 4.9.2 requires packaging>=22, but you have packaging 21.3 which is incompatible.\r\n",
+      "libpysal 4.9.2 requires shapely>=2.0.1, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "momepy 0.7.2 requires shapely>=2, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "osmnx 1.9.4 requires shapely<2.1,>=2.0, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "pointpats 2.5.0 requires shapely>=2, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "rmm 24.8.2 requires cuda-python<12.0a0,>=11.7.1, but you have cuda-python 12.6.0 which is incompatible.\r\n",
+      "spaghetti 1.7.6 requires shapely>=2.0.1, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "spopt 0.6.1 requires shapely>=2.0.1, but you have shapely 1.8.5.post1 which is incompatible.\r\n",
+      "super-gradients 3.7.1+master requires numpy<=1.23, but you have numpy 1.26.4 which is incompatible.\r\n",
+      "tsfresh 0.20.3 requires scipy>=1.14.0; python_version >= \"3.10\", but you have scipy 1.13.1 which is incompatible.\r\n",
+      "xarray 2024.7.0 requires packaging>=23.1, but you have packaging 21.3 which is incompatible.\u001b[0m\u001b[31m\r\n",
+      "\u001b[0m"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install -q git+https://github.com/Deci-AI/super-gradients.git@stable\n",
+    "!pip install -q roboflow\n",
+    "!pip install -q supervision"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "27044c63",
+   "metadata": {
+    "id": "Q_SvUlB1IOfW",
+    "papermill": {
+     "duration": 0.013362,
+     "end_time": "2024-09-20T07:35:48.843736",
+     "exception": false,
+     "start_time": "2024-09-20T07:35:48.830374",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### 🚨 Restart the runtime\n",
+    "\n",
+    "**After installation is complete, you'll need to restart the runtime after installation completes. Navigate to `Runtime` -> `Restart runtime` and confirm by clicking `Yes` when you see the popup.**\n",
+    "\n",
+    "After that, carry on with the notebook starting from the cell below 👇"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cbd818a8",
+   "metadata": {
+    "id": "DYquuiomg63H",
+    "papermill": {
+     "duration": 0.0145,
+     "end_time": "2024-09-20T07:35:48.871879",
+     "exception": false,
+     "start_time": "2024-09-20T07:35:48.857379",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "**NOTE:** To make it easier for us to manage datasets, images and models we create a `HOME` constant."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "88cc5268",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:35:48.902281Z",
+     "iopub.status.busy": "2024-09-20T07:35:48.901564Z",
+     "iopub.status.idle": "2024-09-20T07:35:48.906868Z",
+     "shell.execute_reply": "2024-09-20T07:35:48.905994Z"
+    },
+    "id": "gyUQ1xT5ijdY",
+    "outputId": "5fcbb3e1-485f-42c0-9a02-e44f627e7b58",
+    "papermill": {
+     "duration": 0.022798,
+     "end_time": "2024-09-20T07:35:48.909060",
+     "exception": false,
+     "start_time": "2024-09-20T07:35:48.886262",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "/kaggle/working\n"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "HOME = os.getcwd()\n",
+    "print(HOME)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0cdd4e3c",
+   "metadata": {
+    "id": "taIbD3ZDdLXW",
+    "papermill": {
+     "duration": 0.013232,
+     "end_time": "2024-09-20T07:35:48.935544",
+     "exception": false,
+     "start_time": "2024-09-20T07:35:48.922312",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Inference with pre-trained COCO model\n",
+    "\n",
+    "Start by instantiating a pretrained model. YOLO-NAS architecture comes in three different sizes: `yolo_nas_s`, `yolo_nas_m`, `and yolo_nas_l`. We will use `yolo_nas_l` throughout this notebook. Keep in mind that depending on your use-case your decision may be different. Take a peek at the diagram below visualizing the speed-accuracy tradeoff.\n",
+    "\n",
+    "<br>\n",
+    "\n",
+    "![YOLO-NAS](https://raw.githubusercontent.com/Deci-AI/super-gradients/master/documentation/source/images/yolo_nas_frontier.png)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "908aca45",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:35:48.963630Z",
+     "iopub.status.busy": "2024-09-20T07:35:48.963331Z",
+     "iopub.status.idle": "2024-09-20T07:35:52.047105Z",
+     "shell.execute_reply": "2024-09-20T07:35:52.046180Z"
+    },
+    "id": "xh_YA7Z4k0jd",
+    "papermill": {
+     "duration": 3.100322,
+     "end_time": "2024-09-20T07:35:52.049378",
+     "exception": false,
+     "start_time": "2024-09-20T07:35:48.949056",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import torch\n",
+    "\n",
+    "DEVICE = 'cuda' if torch.cuda.is_available() else \"cpu\"\n",
+    "MODEL_ARCH = 'yolo_nas_l'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "5abcea06",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:35:52.077665Z",
+     "iopub.status.busy": "2024-09-20T07:35:52.077237Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.265234Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.264779Z"
+    },
+    "id": "WV7QtETgcaAh",
+    "papermill": {
+     "duration": 21.204623,
+     "end_time": "2024-09-20T07:36:13.267375",
+     "exception": false,
+     "start_time": "2024-09-20T07:35:52.062752",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "The console stream is logged into /root/sg_logs/console.log\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[2024-09-20 07:35:52] INFO - crash_tips_setup.py - Crash tips is enabled. You can set your environment variable to CRASH_HANDLER=FALSE to disable it\n",
+      "[2024-09-20 07:36:07] INFO - utils.py - NumExpr defaulting to 4 threads.\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[WARNING]No module named 'pycocotools'\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[2024-09-20 07:36:10] INFO - env_sanity_check.py - Library check is not supported when super_gradients installed through \"git+https://github.com/...\" command\n",
+      "[2024-09-20 07:36:11] WARNING - checkpoint_utils.py - :warning: The pre-trained models provided by SuperGradients may have their own licenses or terms and conditions derived from the dataset used for pre-training.\n",
+      " It is your responsibility to determine whether you have permission to use the models for your use case.\n",
+      " The model you have requested was pre-trained on the coco dataset, published under the following terms: https://cocodataset.org/#termsofuse\n",
+      "[2024-09-20 07:36:11] INFO - checkpoint_utils.py - License Notification: YOLO-NAS pre-trained weights are subjected to the specific license terms and conditions detailed in \n",
+      "https://github.com/Deci-AI/super-gradients/blob/master/LICENSE.YOLONAS.md\n",
+      "By downloading the pre-trained weight files you agree to comply with these terms.\n",
+      "Downloading: \"https://sghub.deci.ai/models/yolo_nas_l_coco.pth\" to /root/.cache/torch/hub/checkpoints/yolo_nas_l_coco.pth\n",
+      "100%|██████████| 256M/256M [00:00<00:00, 274MB/s]\n",
+      "[2024-09-20 07:36:12] INFO - checkpoint_utils.py - Successfully loaded pretrained weights for architecture yolo_nas_l\n"
+     ]
+    }
+   ],
+   "source": [
+    "from super_gradients.training import models\n",
+    "\n",
+    "model = models.get(MODEL_ARCH, pretrained_weights=\"coco\").to(DEVICE)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5979b1b9",
+   "metadata": {
+    "id": "yr7leUzniYJf",
+    "papermill": {
+     "duration": 0.014275,
+     "end_time": "2024-09-20T07:36:13.296679",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.282404",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Use Example Data (Below, We'll Prepare Our Own Custom Dataset)\n",
+    "\n",
+    "Let's download few example images. Feel free to replace my images with yours. All you have to do is upload them to the `{HOME}/data` directory. If you're looking for data, take a peek at [Roboflow Universe](https://universe.roboflow.com/)! You're sure to find something interesting."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "b9cc707f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.327731Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.327051Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.329777Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.329459Z"
+    },
+    "id": "2W7Tlk74djos",
+    "outputId": "a60a124e-c8dd-4119-b9dc-422db4d5ef2a",
+    "papermill": {
+     "duration": 0.020694,
+     "end_time": "2024-09-20T07:36:13.332396",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.311702",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "#f\"{HOME}/data\""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "8ce7f9ae",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.362670Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.362338Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.365064Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.364718Z"
+    },
+    "id": "fHx08MdHidz8",
+    "outputId": "116a1b23-80f9-4c7d-ecac-e6423193b45b",
+    "papermill": {
+     "duration": 0.020073,
+     "end_time": "2024-09-20T07:36:13.367405",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.347332",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# %cd {HOME}\n",
+    "# !mkdir {HOME}/data\n",
+    "# %cd {HOME}/data\n",
+    "\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-2.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-3.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-4.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-5.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-6.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-7.jpeg\n",
+    "# !wget -q https://media.roboflow.com/notebooks/examples/dog-8.jpeg"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "fcc043c2",
+   "metadata": {
+    "id": "wDoKN5xsj9Xs",
+    "papermill": {
+     "duration": 0.013751,
+     "end_time": "2024-09-20T07:36:13.395295",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.381544",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Single Image Inference"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "14660d38",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.424549Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.424252Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.426801Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.426441Z"
+    },
+    "id": "_N8bPavSj7hp",
+    "papermill": {
+     "duration": 0.019794,
+     "end_time": "2024-09-20T07:36:13.428972",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.409178",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# SOURCE_IMAGE_PATH = f\"{HOME}/data/dog-3.jpeg\""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "284a05fa",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.458423Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.457777Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.460257Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.459981Z"
+    },
+    "id": "L1wGD5OIioMG",
+    "outputId": "8ff18987-bb9e-476f-e0a0-98a6cc7a0cff",
+    "papermill": {
+     "duration": 0.019548,
+     "end_time": "2024-09-20T07:36:13.462483",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.442935",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import cv2\n",
+    "\n",
+    "# image = cv2.imread(SOURCE_IMAGE_PATH)\n",
+    "# result = model.predict(image, conf=0.35)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b9e28593",
+   "metadata": {
+    "id": "vRZDWmBVlgXa",
+    "papermill": {
+     "duration": 0.014214,
+     "end_time": "2024-09-20T07:36:13.490995",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.476781",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Output format\n",
+    "\n",
+    "For every image YOLO-NAS will produce `ImageDetectionPrediction` object containing the following fields:\n",
+    "- `image` - `numpy.ndarray` - image used for inference\n",
+    "- `class_names` - `List[str]` - list of categories used for training the model\n",
+    "- `prediction` - `DetectionPrediction` - class instance containing detailed informationabout the obtained detections\n",
+    "   - `bboxes_xyxy` - `numpy.ndarray` of `float32` and `(N, 4)` shape - detection bounding boxes in `xyxy` format\n",
+    "   - `confidence` - `numpy.ndarray` of `float32` and `(N,)` shape - confidence value between `0` and `1`\n",
+    "   - `labels` - `numpy.ndarray` of `float32` and `(N,)` shape - `class_id` related to the index in the `class_names` list"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "2382002c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.520472Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.520166Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.522251Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.521952Z"
+    },
+    "id": "p8_uWjMQp3kS",
+    "outputId": "30f24205-9c8b-465b-f0cf-de5e35155761",
+    "papermill": {
+     "duration": 0.019153,
+     "end_time": "2024-09-20T07:36:13.524403",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.505250",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# type(result)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "50429fc8",
+   "metadata": {
+    "id": "-HNz2E4IkX_W",
+    "papermill": {
+     "duration": 0.013951,
+     "end_time": "2024-09-20T07:36:13.552278",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.538327",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Visualize Inference Result\n",
+    "\n",
+    "As with other models, you can use Supervision to visualize your results. You can read more about the integration between Supervision and YOLO-NAS [here](https://roboflow.github.io/supervision/detection/core/#supervision.detection.core.Detections.from_yolo_nas), and about visualizing detection [here](https://roboflow.github.io/supervision/detection/annotate/#supervision.detection.annotate.BoxAnnotator.annotate)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "2c2d1cbb",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.581520Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.581229Z",
+     "iopub.status.idle": "2024-09-20T07:36:13.583806Z",
+     "shell.execute_reply": "2024-09-20T07:36:13.583545Z"
+    },
+    "id": "9ONQJdyu2nqg",
+    "outputId": "4d57ab3c-79ac-4360-cc76-7059f4bbd01d",
+    "papermill": {
+     "duration": 0.019537,
+     "end_time": "2024-09-20T07:36:13.586027",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.566490",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import supervision as sv\n",
+    "\n",
+    "# detections = sv.Detections(\n",
+    "#     xyxy=result.prediction.bboxes_xyxy,\n",
+    "#     confidence=result.prediction.confidence,\n",
+    "#     class_id=result.prediction.labels.astype(int)\n",
+    "# )\n",
+    "\n",
+    "# box_annotator = sv.BoxAnnotator()\n",
+    "\n",
+    "# labels = [\n",
+    "#     f\"{result.class_names[class_id]} {confidence:0.2f}\"\n",
+    "#     for _, _, confidence, class_id, _\n",
+    "#     in detections\n",
+    "# ]\n",
+    "\n",
+    "# annotated_frame = box_annotator.annotate(\n",
+    "#     scene=image.copy(),\n",
+    "#     detections=detections,\n",
+    "#     labels=labels\n",
+    "# )\n",
+    "\n",
+    "# %matplotlib inline\n",
+    "# sv.plot_image(annotated_frame, (12, 12))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "56090f95",
+   "metadata": {
+    "id": "dzJFe5NwBPZp",
+    "papermill": {
+     "duration": 0.014031,
+     "end_time": "2024-09-20T07:36:13.614196",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.600165",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Over 100k Open Source Computer Vision Datasets are on Roboflow Universe\n",
+    "\n",
+    "Need data for your project? Before spending time on annotating, check out Roboflow Universe, a repository of more than 110,000 open-source datasets that you can use in your projects. You'll find datasets containing everything from annotated cracks in concrete to plant images with disease annotations.\n",
+    "\n",
+    "\n",
+    "[![Roboflow Universe](https://media.roboflow.com/notebooks/template/uni-banner-frame.png?ik-sdk-version=javascript-1.4.3&updatedAt=1672878480290)](https://universe.roboflow.com/)\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5d603b3c",
+   "metadata": {
+    "id": "1Q8thbbTBreB",
+    "papermill": {
+     "duration": 0.013862,
+     "end_time": "2024-09-20T07:36:13.642160",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.628298",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Training YOLO-NAS on a Custom Dataset\n",
+    "\n",
+    "## Preparing a custom dataset\n",
+    "\n",
+    "Building a custom dataset can be a painful process. It might take dozens or even hundreds of hours to collect images, label them, and export them in the proper format. Fortunately, Roboflow makes this process as straightforward and fast as possible. Let me show you how!\n",
+    "\n",
+    "### Step 1: Creating project\n",
+    "\n",
+    "Before you start, you need to create a Roboflow [account](https://app.roboflow.com/login). Once you do that, you can create a new project in the Roboflow [dashboard](https://app.roboflow.com/). Keep in mind to choose the right project type. In our case, Object Detection.\n",
+    "\n",
+    "<div align=\"center\">\n",
+    "  <img\n",
+    "    width=\"640\"\n",
+    "    src=\"https://media.roboflow.com/preparing-custom-dataset-example/creating-project.gif?ik-sdk-version=javascript-1.4.3&updatedAt=1672929799852\"\n",
+    "  >\n",
+    "</div>\n",
+    "\n",
+    "### Step 2: Uploading images or video\n",
+    "\n",
+    "Next, add the data to your newly created project. You can do it via API or through our [web interface](https://docs.roboflow.com/adding-data/object-detection).\n",
+    "\n",
+    "If you drag and drop a directory with a dataset in a supported format, the Roboflow dashboard will automatically read the images and annotations together.\n",
+    "\n",
+    "<div align=\"center\">\n",
+    "  <img\n",
+    "    width=\"640\"\n",
+    "    src=\"https://media.roboflow.com/preparing-custom-dataset-example/uploading-images.gif?ik-sdk-version=javascript-1.4.3&updatedAt=1672929808290\"\n",
+    "  >\n",
+    "</div>\n",
+    "\n",
+    "### Step 3: Labeling\n",
+    "\n",
+    "If you only have images, you can label them in [Roboflow Annotate](https://docs.roboflow.com/annotate).\n",
+    "\n",
+    "<div align=\"center\">\n",
+    "  <img\n",
+    "    width=\"640\"\n",
+    "    src=\"https://user-images.githubusercontent.com/26109316/210901980-04861efd-dfc0-4a01-9373-13a36b5e1df4.gif\"\n",
+    "  >\n",
+    "</div>\n",
+    "\n",
+    "### Step 4: Generate new dataset version\n",
+    "\n",
+    "Now that we have our images and annotations added, we can Generate a Dataset Version. When Generating a Version, you may elect to add preprocessing and augmentations. This step is completely optional, however, it can allow you to significantly improve the robustness of your model.\n",
+    "\n",
+    "<div align=\"center\">\n",
+    "  <img\n",
+    "    width=\"640\"\n",
+    "    src=\"https://media.roboflow.com/preparing-custom-dataset-example/generate-new-version.gif?ik-sdk-version=javascript-1.4.3&updatedAt=1673003597834\"\n",
+    "  >\n",
+    "</div>\n",
+    "\n",
+    "### Step 5: Exporting dataset\n",
+    "\n",
+    "Once the dataset version is generated, we have a hosted dataset we can load directly into our notebook for easy training. Click `Export` and select the `YOLO v5 PyTorch` dataset format.\n",
+    "\n",
+    "<div align=\"center\">\n",
+    "  <img\n",
+    "    width=\"640\"\n",
+    "    src=\"https://media.roboflow.com/preparing-custom-dataset-example/export.gif?ik-sdk-version=javascript-1.4.3&updatedAt=1672943313709\"\n",
+    "  >\n",
+    "</div>\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "bbde0d49",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:13.671345Z",
+     "iopub.status.busy": "2024-09-20T07:36:13.671047Z",
+     "iopub.status.idle": "2024-09-20T07:36:28.776746Z",
+     "shell.execute_reply": "2024-09-20T07:36:28.776302Z"
+    },
+    "id": "clSaBPhCi2v3",
+    "outputId": "ac5ebc7e-f1fa-4edb-b397-4d58af52d978",
+    "papermill": {
+     "duration": 15.123056,
+     "end_time": "2024-09-20T07:36:28.779136",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:13.656080",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "/kaggle/working\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/opt/conda/lib/python3.10/pty.py:89: RuntimeWarning: os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.\n",
+      "  pid, fd = os.forkpty()\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: roboflow in /opt/conda/lib/python3.10/site-packages (1.1.45)\r\n",
+      "Requirement already satisfied: certifi in /opt/conda/lib/python3.10/site-packages (from roboflow) (2024.7.4)\r\n",
+      "Requirement already satisfied: idna==3.7 in /opt/conda/lib/python3.10/site-packages (from roboflow) (3.7)\r\n",
+      "Requirement already satisfied: cycler in /opt/conda/lib/python3.10/site-packages (from roboflow) (0.12.1)\r\n",
+      "Requirement already satisfied: kiwisolver>=1.3.1 in /opt/conda/lib/python3.10/site-packages (from roboflow) (1.4.5)\r\n",
+      "Requirement already satisfied: matplotlib in /opt/conda/lib/python3.10/site-packages (from roboflow) (3.7.5)\r\n",
+      "Requirement already satisfied: numpy>=1.18.5 in /opt/conda/lib/python3.10/site-packages (from roboflow) (1.26.4)\r\n",
+      "Requirement already satisfied: opencv-python-headless==4.10.0.84 in /opt/conda/lib/python3.10/site-packages (from roboflow) (4.10.0.84)\r\n",
+      "Requirement already satisfied: Pillow>=7.1.2 in /opt/conda/lib/python3.10/site-packages (from roboflow) (10.4.0)\r\n",
+      "Requirement already satisfied: python-dateutil in /opt/conda/lib/python3.10/site-packages (from roboflow) (2.9.0.post0)\r\n",
+      "Requirement already satisfied: python-dotenv in /opt/conda/lib/python3.10/site-packages (from roboflow) (1.0.1)\r\n",
+      "Requirement already satisfied: requests in /opt/conda/lib/python3.10/site-packages (from roboflow) (2.32.3)\r\n",
+      "Requirement already satisfied: six in /opt/conda/lib/python3.10/site-packages (from roboflow) (1.16.0)\r\n",
+      "Requirement already satisfied: urllib3>=1.26.6 in /opt/conda/lib/python3.10/site-packages (from roboflow) (1.26.18)\r\n",
+      "Requirement already satisfied: tqdm>=4.41.0 in /opt/conda/lib/python3.10/site-packages (from roboflow) (4.66.4)\r\n",
+      "Requirement already satisfied: PyYAML>=5.3.1 in /opt/conda/lib/python3.10/site-packages (from roboflow) (6.0.2)\r\n",
+      "Requirement already satisfied: requests-toolbelt in /opt/conda/lib/python3.10/site-packages (from roboflow) (0.10.1)\r\n",
+      "Requirement already satisfied: filetype in /opt/conda/lib/python3.10/site-packages (from roboflow) (1.2.0)\r\n",
+      "Requirement already satisfied: contourpy>=1.0.1 in /opt/conda/lib/python3.10/site-packages (from matplotlib->roboflow) (1.2.1)\r\n",
+      "Requirement already satisfied: fonttools>=4.22.0 in /opt/conda/lib/python3.10/site-packages (from matplotlib->roboflow) (4.53.0)\r\n",
+      "Requirement already satisfied: packaging>=20.0 in /opt/conda/lib/python3.10/site-packages (from matplotlib->roboflow) (21.3)\r\n",
+      "Requirement already satisfied: pyparsing>=2.3.1 in /opt/conda/lib/python3.10/site-packages (from matplotlib->roboflow) (3.1.2)\r\n",
+      "Requirement already satisfied: charset-normalizer<4,>=2 in /opt/conda/lib/python3.10/site-packages (from requests->roboflow) (3.3.2)\r\n",
+      "loading Roboflow workspace...\n",
+      "loading Roboflow project...\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Downloading Dataset Version Zip in Fighter-Jet-1 to yolov5pytorch::  68%|██████▊   | 8760/12813 [00:00<00:00, 44398.38it/s]"
+     ]
+    }
+   ],
+   "source": [
+    "%cd {HOME}\n",
+    "\n",
+    "!pip install roboflow\n",
+    "\n",
+    "from roboflow import Roboflow\n",
+    "rf = Roboflow(api_key=\"OX5LGF0zNUWp6nV9jsTi\")\n",
+    "project = rf.workspace(\"husseinkhan\").project(\"fighter-jet-a5a9w\")\n",
+    "version = project.version(1)\n",
+    "dataset = version.download(\"yolov5\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "be3a2f6f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:28.810404Z",
+     "iopub.status.busy": "2024-09-20T07:36:28.810073Z",
+     "iopub.status.idle": "2024-09-20T07:36:28.813271Z",
+     "shell.execute_reply": "2024-09-20T07:36:28.812998Z"
+    },
+    "id": "y6IjTSfetvTl",
+    "outputId": "f0a6a95a-318c-41e8-8980-aae2c2ef7a06",
+    "papermill": {
+     "duration": 0.021493,
+     "end_time": "2024-09-20T07:36:28.815829",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:28.794336",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "LOCATION = dataset.location\n",
+    "print(\"location:\", LOCATION)\n",
+    "CLASSES = sorted(project.classes.keys())\n",
+    "print(\"classes:\", CLASSES)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "75b15c59",
+   "metadata": {
+    "id": "chwFA8qHf45f",
+    "papermill": {
+     "duration": 0.015429,
+     "end_time": "2024-09-20T07:36:28.846242",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:28.830813",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Fine-tune on custom dataset\n",
+    "\n",
+    "`ckpt_root_dir` - this is the directory where results from all your experiments will be saved\n",
+    "\n",
+    "`experiment_name` - all checkpoints, logs, and tensorboards will be saved in a directory with the name you specify here."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "46ebe7ad",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:28.879434Z",
+     "iopub.status.busy": "2024-09-20T07:36:28.878701Z",
+     "iopub.status.idle": "2024-09-20T07:36:28.882059Z",
+     "shell.execute_reply": "2024-09-20T07:36:28.881773Z"
+    },
+    "id": "pCW34CVDHuKr",
+    "papermill": {
+     "duration": 0.022436,
+     "end_time": "2024-09-20T07:36:28.884467",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:28.862031",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "MODEL_ARCH = 'yolo_nas_l'\n",
+    "BATCH_SIZE = 8\n",
+    "MAX_EPOCHS = 25\n",
+    "CHECKPOINT_DIR = f'{HOME}/checkpoints'\n",
+    "EXPERIMENT_NAME = project.name.lower().replace(\" \", \"_\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "e01b110c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:28.917463Z",
+     "iopub.status.busy": "2024-09-20T07:36:28.917130Z",
+     "iopub.status.idle": "2024-09-20T07:36:28.927973Z",
+     "shell.execute_reply": "2024-09-20T07:36:28.927694Z"
+    },
+    "id": "sGBOHyPc11LA",
+    "papermill": {
+     "duration": 0.029438,
+     "end_time": "2024-09-20T07:36:28.930034",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:28.900596",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from super_gradients.training import Trainer\n",
+    "\n",
+    "trainer = Trainer(experiment_name=EXPERIMENT_NAME, ckpt_root_dir=CHECKPOINT_DIR)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "54f4d722",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:28.963156Z",
+     "iopub.status.busy": "2024-09-20T07:36:28.962525Z",
+     "iopub.status.idle": "2024-09-20T07:36:28.965602Z",
+     "shell.execute_reply": "2024-09-20T07:36:28.965337Z"
+    },
+    "id": "0K0strkSsae3",
+    "papermill": {
+     "duration": 0.021831,
+     "end_time": "2024-09-20T07:36:28.967949",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:28.946118",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "dataset_params = {\n",
+    "    'data_dir': LOCATION,\n",
+    "    'train_images_dir':'train/images',\n",
+    "    'train_labels_dir':'train/labels',\n",
+    "    'val_images_dir':'valid/images',\n",
+    "    'val_labels_dir':'valid/labels',\n",
+    "    'test_images_dir':'test/images',\n",
+    "    'test_labels_dir':'test/labels',\n",
+    "    'classes': CLASSES\n",
+    "}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "165b7a8f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:28.999539Z",
+     "iopub.status.busy": "2024-09-20T07:36:28.999263Z",
+     "iopub.status.idle": "2024-09-20T07:36:29.657311Z",
+     "shell.execute_reply": "2024-09-20T07:36:29.657000Z"
+    },
+    "id": "INjHea8ptAtQ",
+    "outputId": "b45c3445-a1a4-4713-84d8-f94506b4b156",
+    "papermill": {
+     "duration": 0.676286,
+     "end_time": "2024-09-20T07:36:29.659371",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:28.983085",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[2024-09-20 07:36:29] INFO - detection_dataset.py - Dataset Initialization in progress. `cache_annotations=True` causes the process to take longer due to full dataset indexing.\n",
+      "Indexing dataset annotations: 100%|██████████| 252/252 [00:00<00:00, 5308.55it/s]\n",
+      "[2024-09-20 07:36:29] INFO - detection_dataset.py - Dataset Initialization in progress. `cache_annotations=True` causes the process to take longer due to full dataset indexing.\n",
+      "Indexing dataset annotations: 100%|██████████| 16/16 [00:00<00:00, 4203.50it/s]\n",
+      "[2024-09-20 07:36:29] INFO - detection_dataset.py - Dataset Initialization in progress. `cache_annotations=True` causes the process to take longer due to full dataset indexing.\n"
+     ]
+    }
+   ],
+   "source": [
+    "from super_gradients.training.dataloaders.dataloaders import (\n",
+    "    coco_detection_yolo_format_train, coco_detection_yolo_format_val)\n",
+    "\n",
+    "train_data = coco_detection_yolo_format_train(\n",
+    "    dataset_params={\n",
+    "        'data_dir': dataset_params['data_dir'],\n",
+    "        'images_dir': dataset_params['train_images_dir'],\n",
+    "        'labels_dir': dataset_params['train_labels_dir'],\n",
+    "        'classes': dataset_params['classes']\n",
+    "    },\n",
+    "    dataloader_params={\n",
+    "        'batch_size': BATCH_SIZE,\n",
+    "        'num_workers': 2\n",
+    "    }\n",
+    ")\n",
+    "\n",
+    "val_data = coco_detection_yolo_format_val(\n",
+    "    dataset_params={\n",
+    "        'data_dir': dataset_params['data_dir'],\n",
+    "        'images_dir': dataset_params['val_images_dir'],\n",
+    "        'labels_dir': dataset_params['val_labels_dir'],\n",
+    "        'classes': dataset_params['classes']\n",
+    "    },\n",
+    "    dataloader_params={\n",
+    "        'batch_size': BATCH_SIZE,\n",
+    "        'num_workers': 2\n",
+    "    }\n",
+    ")\n",
+    "\n",
+    "test_data = coco_detection_yolo_format_val(\n",
+    "    dataset_params={\n",
+    "        'data_dir': dataset_params['data_dir'],\n",
+    "        'images_dir': dataset_params['test_images_dir'],\n",
+    "        'labels_dir': dataset_params['test_labels_dir'],\n",
+    "        'classes': dataset_params['classes']\n",
+    "    },\n",
+    "    dataloader_params={\n",
+    "        'batch_size': BATCH_SIZE,\n",
+    "        'num_workers': 2\n",
+    "    }\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "779c7c72",
+   "metadata": {
+    "id": "Yyo084RCO_6D",
+    "papermill": {
+     "duration": 0.014637,
+     "end_time": "2024-09-20T07:36:29.689436",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:29.674799",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "**NOTE:** Let's inspect our dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "a5718178",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:29.720741Z",
+     "iopub.status.busy": "2024-09-20T07:36:29.720421Z",
+     "iopub.status.idle": "2024-09-20T07:36:29.725179Z",
+     "shell.execute_reply": "2024-09-20T07:36:29.724878Z"
+    },
+    "id": "bhgnHgJIw48k",
+    "papermill": {
+     "duration": 0.024131,
+     "end_time": "2024-09-20T07:36:29.728808",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:29.704677",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[<super_gradients.training.transforms.transforms.DetectionMosaic at 0x7c2e4a0a8820>,\n",
+       " <super_gradients.training.transforms.transforms.DetectionRandomAffine at 0x7c2e4a0a9cf0>,\n",
+       " <super_gradients.training.transforms.transforms.DetectionMixup at 0x7c2e4a0aa0e0>,\n",
+       " <super_gradients.training.transforms.transforms.DetectionHSV at 0x7c2e4a0a9c90>,\n",
+       " <super_gradients.training.transforms.transforms.DetectionHorizontalFlip at 0x7c2e4a0a9cc0>,\n",
+       " <super_gradients.training.transforms.transforms.DetectionPaddedRescale at 0x7c2e4a0aa0b0>,\n",
+       " <super_gradients.training.transforms.transforms.DetectionTargetsFormatTransform at 0x7c2e4a0a9f00>]"
+      ]
+     },
+     "execution_count": 18,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train_data.dataset.transforms"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "40075944",
+   "metadata": {
+    "id": "0QOZ87k9PxIo",
+    "papermill": {
+     "duration": 0.015074,
+     "end_time": "2024-09-20T07:36:29.758790",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:29.743716",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Instantiate the model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "9a1c6f2c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:29.789913Z",
+     "iopub.status.busy": "2024-09-20T07:36:29.789558Z",
+     "iopub.status.idle": "2024-09-20T07:36:30.966852Z",
+     "shell.execute_reply": "2024-09-20T07:36:30.966510Z"
+    },
+    "id": "GyijtlTLxAsU",
+    "outputId": "1b0c6f3e-4e28-48b1-b559-508dd7a20b82",
+    "papermill": {
+     "duration": 1.19558,
+     "end_time": "2024-09-20T07:36:30.969268",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:29.773688",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[2024-09-20 07:36:30] WARNING - checkpoint_utils.py - :warning: The pre-trained models provided by SuperGradients may have their own licenses or terms and conditions derived from the dataset used for pre-training.\n",
+      " It is your responsibility to determine whether you have permission to use the models for your use case.\n",
+      " The model you have requested was pre-trained on the coco dataset, published under the following terms: https://cocodataset.org/#termsofuse\n",
+      "[2024-09-20 07:36:30] INFO - checkpoint_utils.py - License Notification: YOLO-NAS pre-trained weights are subjected to the specific license terms and conditions detailed in \n",
+      "https://github.com/Deci-AI/super-gradients/blob/master/LICENSE.YOLONAS.md\n",
+      "By downloading the pre-trained weight files you agree to comply with these terms.\n",
+      "[2024-09-20 07:36:30] INFO - checkpoint_utils.py - Successfully loaded pretrained weights for architecture yolo_nas_l\n"
+     ]
+    }
+   ],
+   "source": [
+    "from super_gradients.training import models\n",
+    "\n",
+    "model = models.get(\n",
+    "    MODEL_ARCH,\n",
+    "    num_classes=len(dataset_params['classes']),\n",
+    "    pretrained_weights=\"coco\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "040a20a0",
+   "metadata": {
+    "id": "YTr4yUNyPOQt",
+    "papermill": {
+     "duration": 0.050359,
+     "end_time": "2024-09-20T07:36:31.037126",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:30.986767",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Define metrics and training parameters"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "a5b205dc",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:31.070253Z",
+     "iopub.status.busy": "2024-09-20T07:36:31.069380Z",
+     "iopub.status.idle": "2024-09-20T07:36:31.078441Z",
+     "shell.execute_reply": "2024-09-20T07:36:31.078112Z"
+    },
+    "id": "9zwM8lqxyjbm",
+    "papermill": {
+     "duration": 0.027609,
+     "end_time": "2024-09-20T07:36:31.080467",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:31.052858",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from super_gradients.training.losses import PPYoloELoss\n",
+    "from super_gradients.training.metrics import DetectionMetrics_050\n",
+    "from super_gradients.training.models.detection_models.pp_yolo_e import PPYoloEPostPredictionCallback\n",
+    "\n",
+    "train_params = {\n",
+    "    'silent_mode': False,\n",
+    "    \"average_best_models\":True,\n",
+    "    \"warmup_mode\": \"linear_epoch_step\",\n",
+    "    \"warmup_initial_lr\": 1e-6,\n",
+    "    \"lr_warmup_epochs\": 3,\n",
+    "    \"initial_lr\": 5e-4,\n",
+    "    \"lr_mode\": \"cosine\",\n",
+    "    \"cosine_final_lr_ratio\": 0.1,\n",
+    "    \"optimizer\": \"Adam\",\n",
+    "    \"optimizer_params\": {\"weight_decay\": 0.0001},\n",
+    "    \"zero_weight_decay_on_bias_and_bn\": True,\n",
+    "    \"ema\": True,\n",
+    "    \"ema_params\": {\"decay\": 0.9, \"decay_type\": \"threshold\"},\n",
+    "    \"max_epochs\": MAX_EPOCHS,\n",
+    "    \"mixed_precision\": True,\n",
+    "    \"loss\": PPYoloELoss(\n",
+    "        use_static_assigner=False,\n",
+    "        num_classes=len(dataset_params['classes']),\n",
+    "        reg_max=16\n",
+    "    ),\n",
+    "    \"valid_metrics_list\": [\n",
+    "        DetectionMetrics_050(\n",
+    "            score_thres=0.1,\n",
+    "            top_k_predictions=300,\n",
+    "            num_cls=len(dataset_params['classes']),\n",
+    "            normalize_targets=True,\n",
+    "            post_prediction_callback=PPYoloEPostPredictionCallback(\n",
+    "                score_threshold=0.01,\n",
+    "                nms_top_k=1000,\n",
+    "                max_predictions=300,\n",
+    "                nms_threshold=0.7\n",
+    "            )\n",
+    "        )\n",
+    "    ],\n",
+    "    \"metric_to_watch\": 'mAP@0.50'\n",
+    "}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9bc4829b",
+   "metadata": {
+    "id": "yHKsBDTlPk1d",
+    "papermill": {
+     "duration": 0.01512,
+     "end_time": "2024-09-20T07:36:31.111922",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:31.096802",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Train the model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "92bdf737",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:36:31.144155Z",
+     "iopub.status.busy": "2024-09-20T07:36:31.143833Z",
+     "iopub.status.idle": "2024-09-20T07:52:54.525779Z",
+     "shell.execute_reply": "2024-09-20T07:52:54.525257Z"
+    },
+    "id": "1mz05df_yx9b",
+    "papermill": {
+     "duration": 983.401153,
+     "end_time": "2024-09-20T07:52:54.528397",
+     "exception": false,
+     "start_time": "2024-09-20T07:36:31.127244",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[2024-09-20 07:36:31] INFO - sg_trainer.py - Starting a new run with `run_id=RUN_20240920_073631_287173`\n",
+      "[2024-09-20 07:36:31] INFO - sg_trainer.py - Checkpoints directory: /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173\n",
+      "[2024-09-20 07:36:31] INFO - sg_trainer.py - Using EMA with params {'decay': 0.9, 'decay_type': 'threshold'}\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "The console stream is now moved to /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/console_Sep20_07_36_31.txt\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Object name `linear_epoch_step` is now deprecated. Please replace it with `LinearEpochLRWarmup`.\n",
+      "initialize_param_groups and update_param_groups usages are deprecated since 3.4.0, will be removed in 3.5.0 and have no effect. \n",
+      " Assign different learning rates by passing a mapping of layer name prefixes to lr values through initial_lr training hyperparameter (i.e initial_lr={'backbone': 0.01, 'default':0.1})\n",
+      "`torch.cuda.amp.GradScaler(args...)` is deprecated. Please use `torch.amp.GradScaler('cuda', args...)` instead.\n",
+      "os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.\n",
+      "[2024-09-20 07:36:33] INFO - sg_trainer_utils.py - TRAINING PARAMETERS:\n",
+      "    - Mode:                         Single GPU\n",
+      "    - Number of GPUs:               1          (2 available on the machine)\n",
+      "    - Full dataset size:            252        (len(train_set))\n",
+      "    - Batch size per GPU:           8          (batch_size)\n",
+      "    - Batch Accumulate:             1          (batch_accumulate)\n",
+      "    - Total batch size:             8          (num_gpus * batch_size)\n",
+      "    - Effective Batch size:         8          (num_gpus * batch_size * batch_accumulate)\n",
+      "    - Iterations per epoch:         31         (len(train_loader))\n",
+      "    - Gradient updates per epoch:   31         (len(train_loader) / batch_accumulate)\n",
+      "    - Model: YoloNAS_L  (66.91M parameters, 66.91M optimized)\n",
+      "    - Learning Rates and Weight Decays:\n",
+      "      - default: (66.91M parameters). LR: 0.0005 (66.91M parameters) WD: 0.0, (84.69K parameters), WD: 0.0001, (66.82M parameters)\n",
+      "\n",
+      "[2024-09-20 07:36:33] INFO - sg_trainer.py - Started training for 25 epochs (0/24)\n",
+      "\n",
+      "Train epoch 0:   0%|          | 0/31 [00:00<?, ?it/s]`torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.\n",
+      "Train epoch 0: 100%|██████████| 31/31 [00:20<00:00,  1.50it/s, PPYoloELoss/loss=3.52, PPYoloELoss/loss_cls=2.23, PPYoloELoss/loss_dfl=0.724, PPYoloELoss/loss_iou=0.569, gpu_mem=6.74]\n",
+      "Validating: 100%|██████████| 2/2 [00:01<00:00,  1.88it/s]\n",
+      "[2024-09-20 07:36:58] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:36:58] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.034451283514499664\n",
+      "You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 0\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 2.2295\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.569\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.7244\n",
+      "│   └── Ppyoloeloss/loss = 3.5229\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 2.9378\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1452\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.3706\n",
+      "    ├── Ppyoloeloss/loss = 3.4536\n",
+      "    ├── Precision@0.50 = 0.0\n",
+      "    ├── Recall@0.50 = 0.0\n",
+      "    ├── Map@0.50 = 0.0345\n",
+      "    ├── F1@0.50 = 0.0\n",
+      "    └── Best_score_threshold = 0.03\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 1: 100%|██████████| 31/31 [00:18<00:00,  1.69it/s, PPYoloELoss/loss=2.31, PPYoloELoss/loss_cls=1.21, PPYoloELoss/loss_dfl=0.654, PPYoloELoss/loss_iou=0.452, gpu_mem=6.95]\n",
+      "Validating epoch 1: 100%|██████████| 2/2 [00:01<00:00,  1.90it/s]\n",
+      "[2024-09-20 07:37:26] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:37:26] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.7257640361785889\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 1\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.2075\n",
+      "│   │   ├── Epoch N-1      = 2.2295 (\u001b[32m↘ -1.022\u001b[0m)\n",
+      "│   │   └── Best until now = 2.2295 (\u001b[32m↘ -1.022\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4522\n",
+      "│   │   ├── Epoch N-1      = 0.569  (\u001b[32m↘ -0.1169\u001b[0m)\n",
+      "│   │   └── Best until now = 0.569  (\u001b[32m↘ -0.1169\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6535\n",
+      "│   │   ├── Epoch N-1      = 0.7244 (\u001b[32m↘ -0.0709\u001b[0m)\n",
+      "│   │   └── Best until now = 0.7244 (\u001b[32m↘ -0.0709\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.3131\n",
+      "│       ├── Epoch N-1      = 3.5229 (\u001b[32m↘ -1.2098\u001b[0m)\n",
+      "│       └── Best until now = 3.5229 (\u001b[32m↘ -1.2098\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 3.6028\n",
+      "    │   ├── Epoch N-1      = 2.9378 (\u001b[31m↗ 0.665\u001b[0m)\n",
+      "    │   └── Best until now = 2.9378 (\u001b[31m↗ 0.665\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3765\n",
+      "    │   ├── Epoch N-1      = 0.1452 (\u001b[31m↗ 0.2313\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.2313\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.5556\n",
+      "    │   ├── Epoch N-1      = 0.3706 (\u001b[31m↗ 0.185\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.185\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 4.5349\n",
+      "    │   ├── Epoch N-1      = 3.4536 (\u001b[31m↗ 1.0812\u001b[0m)\n",
+      "    │   └── Best until now = 3.4536 (\u001b[31m↗ 1.0812\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0103\n",
+      "    │   ├── Epoch N-1      = 0.0    (\u001b[32m↗ 0.0103\u001b[0m)\n",
+      "    │   └── Best until now = 0.0    (\u001b[32m↗ 0.0103\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.0    (\u001b[32m↗ 0.9583\u001b[0m)\n",
+      "    │   └── Best until now = 0.0    (\u001b[32m↗ 0.9583\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.7258\n",
+      "    │   ├── Epoch N-1      = 0.0345 (\u001b[32m↗ 0.6913\u001b[0m)\n",
+      "    │   └── Best until now = 0.0345 (\u001b[32m↗ 0.6913\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0204\n",
+      "    │   ├── Epoch N-1      = 0.0    (\u001b[32m↗ 0.0204\u001b[0m)\n",
+      "    │   └── Best until now = 0.0    (\u001b[32m↗ 0.0204\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.76\n",
+      "        ├── Epoch N-1      = 0.03   (↗ 0.73\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.73\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 2: 100%|██████████| 31/31 [00:18<00:00,  1.69it/s, PPYoloELoss/loss=2.24, PPYoloELoss/loss_cls=1.03, PPYoloELoss/loss_dfl=0.69, PPYoloELoss/loss_iou=0.515, gpu_mem=6.71]\n",
+      "Validating epoch 2: 100%|██████████| 2/2 [00:01<00:00,  1.88it/s]\n",
+      "[2024-09-20 07:37:54] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:37:54] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.8078726530075073\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 2\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0328\n",
+      "│   │   ├── Epoch N-1      = 1.2075 (\u001b[32m↘ -0.1746\u001b[0m)\n",
+      "│   │   └── Best until now = 1.2075 (\u001b[32m↘ -0.1746\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.5149\n",
+      "│   │   ├── Epoch N-1      = 0.4522 (\u001b[31m↗ 0.0628\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.0628\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6901\n",
+      "│   │   ├── Epoch N-1      = 0.6535 (\u001b[31m↗ 0.0366\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0366\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.2379\n",
+      "│       ├── Epoch N-1      = 2.3131 (\u001b[32m↘ -0.0752\u001b[0m)\n",
+      "│       └── Best until now = 2.3131 (\u001b[32m↘ -0.0752\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 2.3847\n",
+      "    │   ├── Epoch N-1      = 3.6028 (\u001b[32m↘ -1.2181\u001b[0m)\n",
+      "    │   └── Best until now = 2.9378 (\u001b[32m↘ -0.5531\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3746\n",
+      "    │   ├── Epoch N-1      = 0.3765 (\u001b[32m↘ -0.0018\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.2295\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.6049\n",
+      "    │   ├── Epoch N-1      = 0.5556 (\u001b[31m↗ 0.0493\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.2343\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 3.3642\n",
+      "    │   ├── Epoch N-1      = 4.5349 (\u001b[32m↘ -1.1706\u001b[0m)\n",
+      "    │   └── Best until now = 3.4536 (\u001b[32m↘ -0.0894\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0095\n",
+      "    │   ├── Epoch N-1      = 0.0103 (\u001b[31m↘ -0.0008\u001b[0m)\n",
+      "    │   └── Best until now = 0.0103 (\u001b[31m↘ -0.0008\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.8079\n",
+      "    │   ├── Epoch N-1      = 0.7258 (\u001b[32m↗ 0.0821\u001b[0m)\n",
+      "    │   └── Best until now = 0.7258 (\u001b[32m↗ 0.0821\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0188\n",
+      "    │   ├── Epoch N-1      = 0.0204 (\u001b[31m↘ -0.0016\u001b[0m)\n",
+      "    │   └── Best until now = 0.0204 (\u001b[31m↘ -0.0016\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.78\n",
+      "        ├── Epoch N-1      = 0.76   (↗ 0.02\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.75\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 3: 100%|██████████| 31/31 [00:18<00:00,  1.67it/s, PPYoloELoss/loss=2.3, PPYoloELoss/loss_cls=1.06, PPYoloELoss/loss_dfl=0.709, PPYoloELoss/loss_iou=0.54, gpu_mem=6.61]\n",
+      "Validating epoch 3: 100%|██████████| 2/2 [00:01<00:00,  1.86it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 3\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0551\n",
+      "│   │   ├── Epoch N-1      = 1.0328 (\u001b[31m↗ 0.0222\u001b[0m)\n",
+      "│   │   └── Best until now = 1.0328 (\u001b[31m↗ 0.0222\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.5398\n",
+      "│   │   ├── Epoch N-1      = 0.5149 (\u001b[31m↗ 0.0249\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.0877\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.7087\n",
+      "│   │   ├── Epoch N-1      = 0.6901 (\u001b[31m↗ 0.0185\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0552\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.3036\n",
+      "│       ├── Epoch N-1      = 2.2379 (\u001b[31m↗ 0.0656\u001b[0m)\n",
+      "│       └── Best until now = 2.2379 (\u001b[31m↗ 0.0656\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 2.2744\n",
+      "    │   ├── Epoch N-1      = 2.3847 (\u001b[32m↘ -0.1103\u001b[0m)\n",
+      "    │   └── Best until now = 2.3847 (\u001b[32m↘ -0.1103\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.5579\n",
+      "    │   ├── Epoch N-1      = 0.3746 (\u001b[31m↗ 0.1832\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.4127\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.7901\n",
+      "    │   ├── Epoch N-1      = 0.6049 (\u001b[31m↗ 0.1852\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.4195\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 3.6224\n",
+      "    │   ├── Epoch N-1      = 3.3642 (\u001b[31m↗ 0.2582\u001b[0m)\n",
+      "    │   └── Best until now = 3.3642 (\u001b[31m↗ 0.2582\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0062\n",
+      "    │   ├── Epoch N-1      = 0.0095 (\u001b[31m↘ -0.0033\u001b[0m)\n",
+      "    │   └── Best until now = 0.0103 (\u001b[31m↘ -0.0041\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9167\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[31m↘ -0.0417\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[31m↘ -0.0417\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.2986\n",
+      "    │   ├── Epoch N-1      = 0.8079 (\u001b[31m↘ -0.5093\u001b[0m)\n",
+      "    │   └── Best until now = 0.8079 (\u001b[31m↘ -0.5093\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0122\n",
+      "    │   ├── Epoch N-1      = 0.0188 (\u001b[31m↘ -0.0065\u001b[0m)\n",
+      "    │   └── Best until now = 0.0204 (\u001b[31m↘ -0.0081\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.71\n",
+      "        ├── Epoch N-1      = 0.78   (↘ -0.07\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.68\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 4: 100%|██████████| 31/31 [00:18<00:00,  1.66it/s, PPYoloELoss/loss=2.34, PPYoloELoss/loss_cls=1.05, PPYoloELoss/loss_dfl=0.728, PPYoloELoss/loss_iou=0.56, gpu_mem=6.81]\n",
+      "Validating epoch 4: 100%|██████████| 2/2 [00:01<00:00,  1.86it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 4\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0477\n",
+      "│   │   ├── Epoch N-1      = 1.0551 (\u001b[32m↘ -0.0074\u001b[0m)\n",
+      "│   │   └── Best until now = 1.0328 (\u001b[31m↗ 0.0148\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.56\n",
+      "│   │   ├── Epoch N-1      = 0.5398 (\u001b[31m↗ 0.0202\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.1078\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.7284\n",
+      "│   │   ├── Epoch N-1      = 0.7087 (\u001b[31m↗ 0.0198\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0749\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.3361\n",
+      "│       ├── Epoch N-1      = 2.3036 (\u001b[31m↗ 0.0325\u001b[0m)\n",
+      "│       └── Best until now = 2.2379 (\u001b[31m↗ 0.0982\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 2.1682\n",
+      "    │   ├── Epoch N-1      = 2.2744 (\u001b[32m↘ -0.1062\u001b[0m)\n",
+      "    │   └── Best until now = 2.2744 (\u001b[32m↘ -0.1062\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3412\n",
+      "    │   ├── Epoch N-1      = 0.5579 (\u001b[32m↘ -0.2167\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.196\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.5416\n",
+      "    │   ├── Epoch N-1      = 0.7901 (\u001b[32m↘ -0.2485\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.171\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 3.0511\n",
+      "    │   ├── Epoch N-1      = 3.6224 (\u001b[32m↘ -0.5713\u001b[0m)\n",
+      "    │   └── Best until now = 3.3642 (\u001b[32m↘ -0.3131\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.006\n",
+      "    │   ├── Epoch N-1      = 0.0062 (\u001b[31m↘ -0.0001\u001b[0m)\n",
+      "    │   └── Best until now = 0.0103 (\u001b[31m↘ -0.0043\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9167 (\u001b[32m↗ 0.0417\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.7179\n",
+      "    │   ├── Epoch N-1      = 0.2986 (\u001b[32m↗ 0.4193\u001b[0m)\n",
+      "    │   └── Best until now = 0.8079 (\u001b[31m↘ -0.09\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.012\n",
+      "    │   ├── Epoch N-1      = 0.0122 (\u001b[31m↘ -0.0003\u001b[0m)\n",
+      "    │   └── Best until now = 0.0204 (\u001b[31m↘ -0.0084\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.7\n",
+      "        ├── Epoch N-1      = 0.71   (↘ -0.01\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.67\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 5: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=2.35, PPYoloELoss/loss_cls=1.06, PPYoloELoss/loss_dfl=0.74, PPYoloELoss/loss_iou=0.544, gpu_mem=6.7]\n",
+      "Validating epoch 5: 100%|██████████| 2/2 [00:01<00:00,  1.80it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 5\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0614\n",
+      "│   │   ├── Epoch N-1      = 1.0477 (\u001b[31m↗ 0.0137\u001b[0m)\n",
+      "│   │   └── Best until now = 1.0328 (\u001b[31m↗ 0.0285\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.5444\n",
+      "│   │   ├── Epoch N-1      = 0.56   (\u001b[32m↘ -0.0156\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.0922\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.74\n",
+      "│   │   ├── Epoch N-1      = 0.7284 (\u001b[31m↗ 0.0116\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0865\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.3458\n",
+      "│       ├── Epoch N-1      = 2.3361 (\u001b[31m↗ 0.0097\u001b[0m)\n",
+      "│       └── Best until now = 2.2379 (\u001b[31m↗ 0.1079\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 2.2799\n",
+      "    │   ├── Epoch N-1      = 2.1682 (\u001b[31m↗ 0.1117\u001b[0m)\n",
+      "    │   └── Best until now = 2.1682 (\u001b[31m↗ 0.1117\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3908\n",
+      "    │   ├── Epoch N-1      = 0.3412 (\u001b[31m↗ 0.0496\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.2456\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.5873\n",
+      "    │   ├── Epoch N-1      = 0.5416 (\u001b[31m↗ 0.0457\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.2167\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 3.2581\n",
+      "    │   ├── Epoch N-1      = 3.0511 (\u001b[31m↗ 0.207\u001b[0m)\n",
+      "    │   └── Best until now = 3.0511 (\u001b[31m↗ 0.207\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0072\n",
+      "    │   ├── Epoch N-1      = 0.006  (\u001b[32m↗ 0.0012\u001b[0m)\n",
+      "    │   └── Best until now = 0.0103 (\u001b[31m↘ -0.0031\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9167\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[31m↘ -0.0417\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[31m↘ -0.0417\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.482\n",
+      "    │   ├── Epoch N-1      = 0.7179 (\u001b[31m↘ -0.2358\u001b[0m)\n",
+      "    │   └── Best until now = 0.8079 (\u001b[31m↘ -0.3259\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0144\n",
+      "    │   ├── Epoch N-1      = 0.012  (\u001b[32m↗ 0.0024\u001b[0m)\n",
+      "    │   └── Best until now = 0.0204 (\u001b[31m↘ -0.006\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.7\n",
+      "        ├── Epoch N-1      = 0.7    (= 0.0\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.67\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 6: 100%|██████████| 31/31 [00:18<00:00,  1.66it/s, PPYoloELoss/loss=2.22, PPYoloELoss/loss_cls=1.04, PPYoloELoss/loss_dfl=0.684, PPYoloELoss/loss_iou=0.496, gpu_mem=6.73]\n",
+      "Validating epoch 6: 100%|██████████| 2/2 [00:01<00:00,  1.86it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 6\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0445\n",
+      "│   │   ├── Epoch N-1      = 1.0614 (\u001b[32m↘ -0.0168\u001b[0m)\n",
+      "│   │   └── Best until now = 1.0328 (\u001b[31m↗ 0.0117\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4961\n",
+      "│   │   ├── Epoch N-1      = 0.5444 (\u001b[32m↘ -0.0482\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.044\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6837\n",
+      "│   │   ├── Epoch N-1      = 0.74   (\u001b[32m↘ -0.0563\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0302\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.2244\n",
+      "│       ├── Epoch N-1      = 2.3458 (\u001b[32m↘ -0.1214\u001b[0m)\n",
+      "│       └── Best until now = 2.2379 (\u001b[32m↘ -0.0135\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 1.2436\n",
+      "    │   ├── Epoch N-1      = 2.2799 (\u001b[32m↘ -1.0363\u001b[0m)\n",
+      "    │   └── Best until now = 2.1682 (\u001b[32m↘ -0.9246\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3594\n",
+      "    │   ├── Epoch N-1      = 0.3908 (\u001b[32m↘ -0.0314\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.2142\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.541\n",
+      "    │   ├── Epoch N-1      = 0.5873 (\u001b[32m↘ -0.0463\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.1703\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 2.144\n",
+      "    │   ├── Epoch N-1      = 3.2581 (\u001b[32m↘ -1.1141\u001b[0m)\n",
+      "    │   └── Best until now = 3.0511 (\u001b[32m↘ -0.9071\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0124\n",
+      "    │   ├── Epoch N-1      = 0.0072 (\u001b[32m↗ 0.0052\u001b[0m)\n",
+      "    │   └── Best until now = 0.0103 (\u001b[32m↗ 0.0021\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9167 (\u001b[32m↗ 0.0417\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.7956\n",
+      "    │   ├── Epoch N-1      = 0.482  (\u001b[32m↗ 0.3136\u001b[0m)\n",
+      "    │   └── Best until now = 0.8079 (\u001b[31m↘ -0.0123\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0245\n",
+      "    │   ├── Epoch N-1      = 0.0144 (\u001b[32m↗ 0.0102\u001b[0m)\n",
+      "    │   └── Best until now = 0.0204 (\u001b[32m↗ 0.0042\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.6\n",
+      "        ├── Epoch N-1      = 0.7    (↘ -0.1\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.57\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 7: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=2.2, PPYoloELoss/loss_cls=1.04, PPYoloELoss/loss_dfl=0.678, PPYoloELoss/loss_iou=0.484, gpu_mem=6.84]\n",
+      "Validating epoch 7: 100%|██████████| 2/2 [00:01<00:00,  1.81it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 7\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0364\n",
+      "│   │   ├── Epoch N-1      = 1.0445 (\u001b[32m↘ -0.0081\u001b[0m)\n",
+      "│   │   └── Best until now = 1.0328 (\u001b[31m↗ 0.0036\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4836\n",
+      "│   │   ├── Epoch N-1      = 0.4961 (\u001b[32m↘ -0.0125\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.0315\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.678\n",
+      "│   │   ├── Epoch N-1      = 0.6837 (\u001b[32m↘ -0.0057\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0245\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.198\n",
+      "│       ├── Epoch N-1      = 2.2244 (\u001b[32m↘ -0.0264\u001b[0m)\n",
+      "│       └── Best until now = 2.2244 (\u001b[32m↘ -0.0264\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 1.2284\n",
+      "    │   ├── Epoch N-1      = 1.2436 (\u001b[32m↘ -0.0153\u001b[0m)\n",
+      "    │   └── Best until now = 1.2436 (\u001b[32m↘ -0.0153\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3045\n",
+      "    │   ├── Epoch N-1      = 0.3594 (\u001b[32m↘ -0.0549\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1593\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.517\n",
+      "    │   ├── Epoch N-1      = 0.541  (\u001b[32m↘ -0.024\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.1463\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 2.0498\n",
+      "    │   ├── Epoch N-1      = 2.144  (\u001b[32m↘ -0.0942\u001b[0m)\n",
+      "    │   └── Best until now = 2.144  (\u001b[32m↘ -0.0942\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0125\n",
+      "    │   ├── Epoch N-1      = 0.0124 (\u001b[32m↗ 0.0001\u001b[0m)\n",
+      "    │   └── Best until now = 0.0124 (\u001b[32m↗ 0.0001\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.579\n",
+      "    │   ├── Epoch N-1      = 0.7956 (\u001b[31m↘ -0.2166\u001b[0m)\n",
+      "    │   └── Best until now = 0.8079 (\u001b[31m↘ -0.2289\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0248\n",
+      "    │   ├── Epoch N-1      = 0.0245 (\u001b[32m↗ 0.0003\u001b[0m)\n",
+      "    │   └── Best until now = 0.0245 (\u001b[32m↗ 0.0003\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.52\n",
+      "        ├── Epoch N-1      = 0.6    (↘ -0.08\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.49\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 8: 100%|██████████| 31/31 [00:18<00:00,  1.63it/s, PPYoloELoss/loss=2.13, PPYoloELoss/loss_cls=0.991, PPYoloELoss/loss_dfl=0.663, PPYoloELoss/loss_iou=0.48, gpu_mem=6.76]\n",
+      "Validating epoch 8: 100%|██████████| 2/2 [00:01<00:00,  1.77it/s]\n",
+      "[2024-09-20 07:41:08] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:41:08] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.8096352815628052\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 8\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9914\n",
+      "│   │   ├── Epoch N-1      = 1.0364 (\u001b[32m↘ -0.045\u001b[0m)\n",
+      "│   │   └── Best until now = 1.0328 (\u001b[32m↘ -0.0415\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.48\n",
+      "│   │   ├── Epoch N-1      = 0.4836 (\u001b[32m↘ -0.0036\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.0278\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6632\n",
+      "│   │   ├── Epoch N-1      = 0.678  (\u001b[32m↘ -0.0148\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0097\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.1345\n",
+      "│       ├── Epoch N-1      = 2.198  (\u001b[32m↘ -0.0635\u001b[0m)\n",
+      "│       └── Best until now = 2.198  (\u001b[32m↘ -0.0635\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 1.0449\n",
+      "    │   ├── Epoch N-1      = 1.2284 (\u001b[32m↘ -0.1835\u001b[0m)\n",
+      "    │   └── Best until now = 1.2284 (\u001b[32m↘ -0.1835\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3202\n",
+      "    │   ├── Epoch N-1      = 0.3045 (\u001b[31m↗ 0.0157\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.175\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.5321\n",
+      "    │   ├── Epoch N-1      = 0.517  (\u001b[31m↗ 0.0152\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.1615\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.8972\n",
+      "    │   ├── Epoch N-1      = 2.0498 (\u001b[32m↘ -0.1526\u001b[0m)\n",
+      "    │   └── Best until now = 2.0498 (\u001b[32m↘ -0.1526\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0195\n",
+      "    │   ├── Epoch N-1      = 0.0125 (\u001b[32m↗ 0.0069\u001b[0m)\n",
+      "    │   └── Best until now = 0.0125 (\u001b[32m↗ 0.0069\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.8096\n",
+      "    │   ├── Epoch N-1      = 0.579  (\u001b[32m↗ 0.2307\u001b[0m)\n",
+      "    │   └── Best until now = 0.8079 (\u001b[32m↗ 0.0018\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0382\n",
+      "    │   ├── Epoch N-1      = 0.0248 (\u001b[32m↗ 0.0134\u001b[0m)\n",
+      "    │   └── Best until now = 0.0248 (\u001b[32m↗ 0.0134\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.52\n",
+      "        ├── Epoch N-1      = 0.52   (= 0.0\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.49\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 9: 100%|██████████| 31/31 [00:18<00:00,  1.66it/s, PPYoloELoss/loss=2.12, PPYoloELoss/loss_cls=1.01, PPYoloELoss/loss_dfl=0.656, PPYoloELoss/loss_iou=0.457, gpu_mem=6.78]\n",
+      "Validating epoch 9: 100%|██████████| 2/2 [00:01<00:00,  1.76it/s]\n",
+      "[2024-09-20 07:41:54] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:41:54] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.8558063507080078\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 9\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 1.0068\n",
+      "│   │   ├── Epoch N-1      = 0.9914 (\u001b[31m↗ 0.0155\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9914 (\u001b[31m↗ 0.0155\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4572\n",
+      "│   │   ├── Epoch N-1      = 0.48   (\u001b[32m↘ -0.0228\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[31m↗ 0.005\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6556\n",
+      "│   │   ├── Epoch N-1      = 0.6632 (\u001b[32m↘ -0.0076\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[31m↗ 0.0021\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.1197\n",
+      "│       ├── Epoch N-1      = 2.1345 (\u001b[32m↘ -0.0148\u001b[0m)\n",
+      "│       └── Best until now = 2.1345 (\u001b[32m↘ -0.0148\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.8821\n",
+      "    │   ├── Epoch N-1      = 1.0449 (\u001b[32m↘ -0.1628\u001b[0m)\n",
+      "    │   └── Best until now = 1.0449 (\u001b[32m↘ -0.1628\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.3062\n",
+      "    │   ├── Epoch N-1      = 0.3202 (\u001b[32m↘ -0.014\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.161\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4933\n",
+      "    │   ├── Epoch N-1      = 0.5321 (\u001b[32m↘ -0.0388\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.1227\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.6816\n",
+      "    │   ├── Epoch N-1      = 1.8972 (\u001b[32m↘ -0.2157\u001b[0m)\n",
+      "    │   └── Best until now = 1.8972 (\u001b[32m↘ -0.2157\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0269\n",
+      "    │   ├── Epoch N-1      = 0.0195 (\u001b[32m↗ 0.0074\u001b[0m)\n",
+      "    │   └── Best until now = 0.0195 (\u001b[32m↗ 0.0074\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.8558\n",
+      "    │   ├── Epoch N-1      = 0.8096 (\u001b[32m↗ 0.0462\u001b[0m)\n",
+      "    │   └── Best until now = 0.8096 (\u001b[32m↗ 0.0462\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0523\n",
+      "    │   ├── Epoch N-1      = 0.0382 (\u001b[32m↗ 0.0141\u001b[0m)\n",
+      "    │   └── Best until now = 0.0382 (\u001b[32m↗ 0.0141\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.56\n",
+      "        ├── Epoch N-1      = 0.52   (↗ 0.04\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.53\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 10: 100%|██████████| 31/31 [00:18<00:00,  1.64it/s, PPYoloELoss/loss=2.07, PPYoloELoss/loss_cls=0.988, PPYoloELoss/loss_dfl=0.638, PPYoloELoss/loss_iou=0.446, gpu_mem=6.71]\n",
+      "Validating epoch 10: 100%|██████████| 2/2 [00:01<00:00,  1.75it/s]\n",
+      "[2024-09-20 07:42:37] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:42:37] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.8987051844596863\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 10\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9881\n",
+      "│   │   ├── Epoch N-1      = 1.0068 (\u001b[32m↘ -0.0187\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9914 (\u001b[32m↘ -0.0032\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4463\n",
+      "│   │   ├── Epoch N-1      = 0.4572 (\u001b[32m↘ -0.0109\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4522 (\u001b[32m↘ -0.0059\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6384\n",
+      "│   │   ├── Epoch N-1      = 0.6556 (\u001b[32m↘ -0.0173\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6535 (\u001b[32m↘ -0.0151\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.0728\n",
+      "│       ├── Epoch N-1      = 2.1197 (\u001b[32m↘ -0.0469\u001b[0m)\n",
+      "│       └── Best until now = 2.1197 (\u001b[32m↘ -0.0469\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.9533\n",
+      "    │   ├── Epoch N-1      = 0.8821 (\u001b[31m↗ 0.0712\u001b[0m)\n",
+      "    │   └── Best until now = 0.8821 (\u001b[31m↗ 0.0712\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2753\n",
+      "    │   ├── Epoch N-1      = 0.3062 (\u001b[32m↘ -0.0309\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1301\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4689\n",
+      "    │   ├── Epoch N-1      = 0.4933 (\u001b[32m↘ -0.0244\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0982\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.6974\n",
+      "    │   ├── Epoch N-1      = 1.6816 (\u001b[31m↗ 0.0158\u001b[0m)\n",
+      "    │   └── Best until now = 1.6816 (\u001b[31m↗ 0.0158\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0257\n",
+      "    │   ├── Epoch N-1      = 0.0269 (\u001b[31m↘ -0.0012\u001b[0m)\n",
+      "    │   └── Best until now = 0.0269 (\u001b[31m↘ -0.0012\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.8987\n",
+      "    │   ├── Epoch N-1      = 0.8558 (\u001b[32m↗ 0.0429\u001b[0m)\n",
+      "    │   └── Best until now = 0.8558 (\u001b[32m↗ 0.0429\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0501\n",
+      "    │   ├── Epoch N-1      = 0.0523 (\u001b[31m↘ -0.0022\u001b[0m)\n",
+      "    │   └── Best until now = 0.0523 (\u001b[31m↘ -0.0022\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.54\n",
+      "        ├── Epoch N-1      = 0.56   (↘ -0.02\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.51\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 11: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.98, PPYoloELoss/loss_cls=0.937, PPYoloELoss/loss_dfl=0.618, PPYoloELoss/loss_iou=0.423, gpu_mem=6.72]\n",
+      "Validating epoch 11: 100%|██████████| 2/2 [00:01<00:00,  1.78it/s]\n",
+      "[2024-09-20 07:43:18] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:43:18] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9090073704719543\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 11\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9371\n",
+      "│   │   ├── Epoch N-1      = 0.9881 (\u001b[32m↘ -0.051\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9881 (\u001b[32m↘ -0.051\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4233\n",
+      "│   │   ├── Epoch N-1      = 0.4463 (\u001b[32m↘ -0.023\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4463 (\u001b[32m↘ -0.023\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6182\n",
+      "│   │   ├── Epoch N-1      = 0.6384 (\u001b[32m↘ -0.0202\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6384 (\u001b[32m↘ -0.0202\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.9786\n",
+      "│       ├── Epoch N-1      = 2.0728 (\u001b[32m↘ -0.0942\u001b[0m)\n",
+      "│       └── Best until now = 2.0728 (\u001b[32m↘ -0.0942\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.8431\n",
+      "    │   ├── Epoch N-1      = 0.9533 (\u001b[32m↘ -0.1102\u001b[0m)\n",
+      "    │   └── Best until now = 0.8821 (\u001b[32m↘ -0.039\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2907\n",
+      "    │   ├── Epoch N-1      = 0.2753 (\u001b[31m↗ 0.0154\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1455\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4849\n",
+      "    │   ├── Epoch N-1      = 0.4689 (\u001b[31m↗ 0.016\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.1143\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.6187\n",
+      "    │   ├── Epoch N-1      = 1.6974 (\u001b[32m↘ -0.0788\u001b[0m)\n",
+      "    │   └── Best until now = 1.6816 (\u001b[32m↘ -0.0629\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0331\n",
+      "    │   ├── Epoch N-1      = 0.0257 (\u001b[32m↗ 0.0074\u001b[0m)\n",
+      "    │   └── Best until now = 0.0269 (\u001b[32m↗ 0.0062\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.909\n",
+      "    │   ├── Epoch N-1      = 0.8987 (\u001b[32m↗ 0.0103\u001b[0m)\n",
+      "    │   └── Best until now = 0.8987 (\u001b[32m↗ 0.0103\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.064\n",
+      "    │   ├── Epoch N-1      = 0.0501 (\u001b[32m↗ 0.0139\u001b[0m)\n",
+      "    │   └── Best until now = 0.0523 (\u001b[32m↗ 0.0117\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.48\n",
+      "        ├── Epoch N-1      = 0.54   (↘ -0.06\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.45\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 12: 100%|██████████| 31/31 [00:18<00:00,  1.66it/s, PPYoloELoss/loss=2.06, PPYoloELoss/loss_cls=0.981, PPYoloELoss/loss_dfl=0.641, PPYoloELoss/loss_iou=0.437, gpu_mem=6.67]\n",
+      "Validating epoch 12: 100%|██████████| 2/2 [00:01<00:00,  1.75it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 12\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9813\n",
+      "│   │   ├── Epoch N-1      = 0.9371 (\u001b[31m↗ 0.0442\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9371 (\u001b[31m↗ 0.0442\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4374\n",
+      "│   │   ├── Epoch N-1      = 0.4233 (\u001b[31m↗ 0.0141\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4233 (\u001b[31m↗ 0.0141\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6409\n",
+      "│   │   ├── Epoch N-1      = 0.6182 (\u001b[31m↗ 0.0227\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6182 (\u001b[31m↗ 0.0227\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.0596\n",
+      "│       ├── Epoch N-1      = 1.9786 (\u001b[31m↗ 0.081\u001b[0m)\n",
+      "│       └── Best until now = 1.9786 (\u001b[31m↗ 0.081\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.9434\n",
+      "    │   ├── Epoch N-1      = 0.8431 (\u001b[31m↗ 0.1003\u001b[0m)\n",
+      "    │   └── Best until now = 0.8431 (\u001b[31m↗ 0.1003\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2675\n",
+      "    │   ├── Epoch N-1      = 0.2907 (\u001b[32m↘ -0.0232\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1223\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4664\n",
+      "    │   ├── Epoch N-1      = 0.4849 (\u001b[32m↘ -0.0185\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0958\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.6773\n",
+      "    │   ├── Epoch N-1      = 1.6187 (\u001b[31m↗ 0.0587\u001b[0m)\n",
+      "    │   └── Best until now = 1.6187 (\u001b[31m↗ 0.0587\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0172\n",
+      "    │   ├── Epoch N-1      = 0.0331 (\u001b[31m↘ -0.0159\u001b[0m)\n",
+      "    │   └── Best until now = 0.0331 (\u001b[31m↘ -0.0159\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.8839\n",
+      "    │   ├── Epoch N-1      = 0.909  (\u001b[31m↘ -0.0251\u001b[0m)\n",
+      "    │   └── Best until now = 0.909  (\u001b[31m↘ -0.0251\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0338\n",
+      "    │   ├── Epoch N-1      = 0.064  (\u001b[31m↘ -0.0301\u001b[0m)\n",
+      "    │   └── Best until now = 0.064  (\u001b[31m↘ -0.0301\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.62\n",
+      "        ├── Epoch N-1      = 0.48   (↗ 0.14\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.59\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 13: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=2, PPYoloELoss/loss_cls=0.949, PPYoloELoss/loss_dfl=0.628, PPYoloELoss/loss_iou=0.425, gpu_mem=6.73]\n",
+      "Validating epoch 13: 100%|██████████| 2/2 [00:01<00:00,  1.79it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 13\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9489\n",
+      "│   │   ├── Epoch N-1      = 0.9813 (\u001b[32m↘ -0.0324\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9371 (\u001b[31m↗ 0.0118\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.425\n",
+      "│   │   ├── Epoch N-1      = 0.4374 (\u001b[32m↘ -0.0124\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4233 (\u001b[31m↗ 0.0016\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.628\n",
+      "│   │   ├── Epoch N-1      = 0.6409 (\u001b[32m↘ -0.0129\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6182 (\u001b[31m↗ 0.0098\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 2.0019\n",
+      "│       ├── Epoch N-1      = 2.0596 (\u001b[32m↘ -0.0577\u001b[0m)\n",
+      "│       └── Best until now = 1.9786 (\u001b[31m↗ 0.0233\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.8214\n",
+      "    │   ├── Epoch N-1      = 0.9434 (\u001b[32m↘ -0.122\u001b[0m)\n",
+      "    │   └── Best until now = 0.8431 (\u001b[32m↘ -0.0217\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2605\n",
+      "    │   ├── Epoch N-1      = 0.2675 (\u001b[32m↘ -0.007\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1153\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4491\n",
+      "    │   ├── Epoch N-1      = 0.4664 (\u001b[32m↘ -0.0174\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0784\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.5309\n",
+      "    │   ├── Epoch N-1      = 1.6773 (\u001b[32m↘ -0.1464\u001b[0m)\n",
+      "    │   └── Best until now = 1.6187 (\u001b[32m↘ -0.0877\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0286\n",
+      "    │   ├── Epoch N-1      = 0.0172 (\u001b[32m↗ 0.0114\u001b[0m)\n",
+      "    │   └── Best until now = 0.0331 (\u001b[31m↘ -0.0045\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9048\n",
+      "    │   ├── Epoch N-1      = 0.8839 (\u001b[32m↗ 0.0209\u001b[0m)\n",
+      "    │   └── Best until now = 0.909  (\u001b[31m↘ -0.0042\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0556\n",
+      "    │   ├── Epoch N-1      = 0.0338 (\u001b[32m↗ 0.0218\u001b[0m)\n",
+      "    │   └── Best until now = 0.064  (\u001b[31m↘ -0.0084\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.53\n",
+      "        ├── Epoch N-1      = 0.62   (↘ -0.09\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.5\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 14: 100%|██████████| 31/31 [00:18<00:00,  1.64it/s, PPYoloELoss/loss=1.95, PPYoloELoss/loss_cls=0.923, PPYoloELoss/loss_dfl=0.611, PPYoloELoss/loss_iou=0.414, gpu_mem=6.7]\n",
+      "Validating epoch 14: 100%|██████████| 2/2 [00:01<00:00,  1.78it/s]\n",
+      "[2024-09-20 07:45:26] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:45:26] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9226588010787964\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 14\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9231\n",
+      "│   │   ├── Epoch N-1      = 0.9489 (\u001b[32m↘ -0.0258\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9371 (\u001b[32m↘ -0.014\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4143\n",
+      "│   │   ├── Epoch N-1      = 0.425  (\u001b[32m↘ -0.0107\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4233 (\u001b[32m↘ -0.009\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6112\n",
+      "│   │   ├── Epoch N-1      = 0.628  (\u001b[32m↘ -0.0168\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6182 (\u001b[32m↘ -0.007\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.9486\n",
+      "│       ├── Epoch N-1      = 2.0019 (\u001b[32m↘ -0.0533\u001b[0m)\n",
+      "│       └── Best until now = 1.9786 (\u001b[32m↘ -0.03\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.7442\n",
+      "    │   ├── Epoch N-1      = 0.8214 (\u001b[32m↘ -0.0772\u001b[0m)\n",
+      "    │   └── Best until now = 0.8214 (\u001b[32m↘ -0.0772\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2669\n",
+      "    │   ├── Epoch N-1      = 0.2605 (\u001b[31m↗ 0.0065\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1218\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4716\n",
+      "    │   ├── Epoch N-1      = 0.4491 (\u001b[31m↗ 0.0225\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.1009\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.4827\n",
+      "    │   ├── Epoch N-1      = 1.5309 (\u001b[32m↘ -0.0482\u001b[0m)\n",
+      "    │   └── Best until now = 1.5309 (\u001b[32m↘ -0.0482\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0346\n",
+      "    │   ├── Epoch N-1      = 0.0286 (\u001b[32m↗ 0.0059\u001b[0m)\n",
+      "    │   └── Best until now = 0.0331 (\u001b[32m↗ 0.0015\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9227\n",
+      "    │   ├── Epoch N-1      = 0.9048 (\u001b[32m↗ 0.0179\u001b[0m)\n",
+      "    │   └── Best until now = 0.909  (\u001b[32m↗ 0.0137\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0668\n",
+      "    │   ├── Epoch N-1      = 0.0556 (\u001b[32m↗ 0.0111\u001b[0m)\n",
+      "    │   └── Best until now = 0.064  (\u001b[32m↗ 0.0028\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.54\n",
+      "        ├── Epoch N-1      = 0.53   (↗ 0.01\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.51\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 15: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.91, PPYoloELoss/loss_cls=0.901, PPYoloELoss/loss_dfl=0.601, PPYoloELoss/loss_iou=0.406, gpu_mem=6.8]\n",
+      "Validating epoch 15: 100%|██████████| 2/2 [00:01<00:00,  1.68it/s]\n",
+      "[2024-09-20 07:46:12] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:46:12] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9302713871002197\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 15\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.9005\n",
+      "│   │   ├── Epoch N-1      = 0.9231 (\u001b[32m↘ -0.0226\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9231 (\u001b[32m↘ -0.0226\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4057\n",
+      "│   │   ├── Epoch N-1      = 0.4143 (\u001b[32m↘ -0.0086\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4143 (\u001b[32m↘ -0.0086\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6011\n",
+      "│   │   ├── Epoch N-1      = 0.6112 (\u001b[32m↘ -0.0101\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6112 (\u001b[32m↘ -0.0101\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.9073\n",
+      "│       ├── Epoch N-1      = 1.9486 (\u001b[32m↘ -0.0413\u001b[0m)\n",
+      "│       └── Best until now = 1.9486 (\u001b[32m↘ -0.0413\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.8121\n",
+      "    │   ├── Epoch N-1      = 0.7442 (\u001b[31m↗ 0.0679\u001b[0m)\n",
+      "    │   └── Best until now = 0.7442 (\u001b[31m↗ 0.0679\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2457\n",
+      "    │   ├── Epoch N-1      = 0.2669 (\u001b[32m↘ -0.0213\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.1005\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.45\n",
+      "    │   ├── Epoch N-1      = 0.4716 (\u001b[32m↘ -0.0216\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0794\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.5078\n",
+      "    │   ├── Epoch N-1      = 1.4827 (\u001b[31m↗ 0.025\u001b[0m)\n",
+      "    │   └── Best until now = 1.4827 (\u001b[31m↗ 0.025\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0235\n",
+      "    │   ├── Epoch N-1      = 0.0346 (\u001b[31m↘ -0.0111\u001b[0m)\n",
+      "    │   └── Best until now = 0.0346 (\u001b[31m↘ -0.0111\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9303\n",
+      "    │   ├── Epoch N-1      = 0.9227 (\u001b[32m↗ 0.0076\u001b[0m)\n",
+      "    │   └── Best until now = 0.9227 (\u001b[32m↗ 0.0076\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0459\n",
+      "    │   ├── Epoch N-1      = 0.0668 (\u001b[31m↘ -0.0209\u001b[0m)\n",
+      "    │   └── Best until now = 0.0668 (\u001b[31m↘ -0.0209\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.54\n",
+      "        ├── Epoch N-1      = 0.54   (= 0.0\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.51\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 16: 100%|██████████| 31/31 [00:18<00:00,  1.64it/s, PPYoloELoss/loss=1.9, PPYoloELoss/loss_cls=0.899, PPYoloELoss/loss_dfl=0.601, PPYoloELoss/loss_iou=0.401, gpu_mem=6.76]\n",
+      "Validating epoch 16: 100%|██████████| 2/2 [00:01<00:00,  1.70it/s]\n",
+      "[2024-09-20 07:47:00] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:47:00] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9365648031234741\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 16\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8992\n",
+      "│   │   ├── Epoch N-1      = 0.9005 (\u001b[32m↘ -0.0013\u001b[0m)\n",
+      "│   │   └── Best until now = 0.9005 (\u001b[32m↘ -0.0013\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.4012\n",
+      "│   │   ├── Epoch N-1      = 0.4057 (\u001b[32m↘ -0.0045\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4057 (\u001b[32m↘ -0.0045\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.6015\n",
+      "│   │   ├── Epoch N-1      = 0.6011 (\u001b[31m↗ 0.0004\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6011 (\u001b[31m↗ 0.0004\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.9019\n",
+      "│       ├── Epoch N-1      = 1.9073 (\u001b[32m↘ -0.0055\u001b[0m)\n",
+      "│       └── Best until now = 1.9073 (\u001b[32m↘ -0.0055\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.7867\n",
+      "    │   ├── Epoch N-1      = 0.8121 (\u001b[32m↘ -0.0254\u001b[0m)\n",
+      "    │   └── Best until now = 0.7442 (\u001b[31m↗ 0.0425\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2202\n",
+      "    │   ├── Epoch N-1      = 0.2457 (\u001b[32m↘ -0.0255\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.075\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.4311\n",
+      "    │   ├── Epoch N-1      = 0.45   (\u001b[32m↘ -0.0189\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0605\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.438\n",
+      "    │   ├── Epoch N-1      = 1.5078 (\u001b[32m↘ -0.0698\u001b[0m)\n",
+      "    │   └── Best until now = 1.4827 (\u001b[32m↘ -0.0448\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0277\n",
+      "    │   ├── Epoch N-1      = 0.0235 (\u001b[32m↗ 0.0042\u001b[0m)\n",
+      "    │   └── Best until now = 0.0346 (\u001b[31m↘ -0.0069\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9366\n",
+      "    │   ├── Epoch N-1      = 0.9303 (\u001b[32m↗ 0.0063\u001b[0m)\n",
+      "    │   └── Best until now = 0.9303 (\u001b[32m↗ 0.0063\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0538\n",
+      "    │   ├── Epoch N-1      = 0.0459 (\u001b[32m↗ 0.0079\u001b[0m)\n",
+      "    │   └── Best until now = 0.0668 (\u001b[31m↘ -0.013\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.57\n",
+      "        ├── Epoch N-1      = 0.54   (↗ 0.03\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.54\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 17: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.85, PPYoloELoss/loss_cls=0.889, PPYoloELoss/loss_dfl=0.582, PPYoloELoss/loss_iou=0.384, gpu_mem=6.66]\n",
+      "Validating epoch 17: 100%|██████████| 2/2 [00:01<00:00,  1.76it/s]\n",
+      "[2024-09-20 07:47:47] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:47:47] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9407596588134766\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 17\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8886\n",
+      "│   │   ├── Epoch N-1      = 0.8992 (\u001b[32m↘ -0.0106\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8992 (\u001b[32m↘ -0.0106\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3837\n",
+      "│   │   ├── Epoch N-1      = 0.4012 (\u001b[32m↘ -0.0175\u001b[0m)\n",
+      "│   │   └── Best until now = 0.4012 (\u001b[32m↘ -0.0175\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.5817\n",
+      "│   │   ├── Epoch N-1      = 0.6015 (\u001b[32m↘ -0.0198\u001b[0m)\n",
+      "│   │   └── Best until now = 0.6011 (\u001b[32m↘ -0.0194\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.854\n",
+      "│       ├── Epoch N-1      = 1.9019 (\u001b[32m↘ -0.0478\u001b[0m)\n",
+      "│       └── Best until now = 1.9019 (\u001b[32m↘ -0.0478\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.7074\n",
+      "    │   ├── Epoch N-1      = 0.7867 (\u001b[32m↘ -0.0793\u001b[0m)\n",
+      "    │   └── Best until now = 0.7442 (\u001b[32m↘ -0.0368\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2201\n",
+      "    │   ├── Epoch N-1      = 0.2202 (\u001b[32m↘ -1e-04\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0749\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.417\n",
+      "    │   ├── Epoch N-1      = 0.4311 (\u001b[32m↘ -0.014\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0464\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.3446\n",
+      "    │   ├── Epoch N-1      = 1.438  (\u001b[32m↘ -0.0934\u001b[0m)\n",
+      "    │   └── Best until now = 1.438  (\u001b[32m↘ -0.0934\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0346\n",
+      "    │   ├── Epoch N-1      = 0.0277 (\u001b[32m↗ 0.0069\u001b[0m)\n",
+      "    │   └── Best until now = 0.0346 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9408\n",
+      "    │   ├── Epoch N-1      = 0.9366 (\u001b[32m↗ 0.0042\u001b[0m)\n",
+      "    │   └── Best until now = 0.9366 (\u001b[32m↗ 0.0042\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0668\n",
+      "    │   ├── Epoch N-1      = 0.0538 (\u001b[32m↗ 0.013\u001b[0m)\n",
+      "    │   └── Best until now = 0.0668 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.67\n",
+      "        ├── Epoch N-1      = 0.57   (↗ 0.1\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.64\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 18: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.8, PPYoloELoss/loss_cls=0.859, PPYoloELoss/loss_dfl=0.569, PPYoloELoss/loss_iou=0.375, gpu_mem=6.76]\n",
+      "Validating epoch 18: 100%|██████████| 2/2 [00:01<00:00,  1.77it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 18\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8588\n",
+      "│   │   ├── Epoch N-1      = 0.8886 (\u001b[32m↘ -0.0298\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8886 (\u001b[32m↘ -0.0298\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3755\n",
+      "│   │   ├── Epoch N-1      = 0.3837 (\u001b[32m↘ -0.0083\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3837 (\u001b[32m↘ -0.0083\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.5686\n",
+      "│   │   ├── Epoch N-1      = 0.5817 (\u001b[32m↘ -0.0131\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5817 (\u001b[32m↘ -0.0131\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.8029\n",
+      "│       ├── Epoch N-1      = 1.854  (\u001b[32m↘ -0.0512\u001b[0m)\n",
+      "│       └── Best until now = 1.854  (\u001b[32m↘ -0.0512\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.7033\n",
+      "    │   ├── Epoch N-1      = 0.7074 (\u001b[32m↘ -0.0041\u001b[0m)\n",
+      "    │   └── Best until now = 0.7074 (\u001b[32m↘ -0.0041\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1699\n",
+      "    │   ├── Epoch N-1      = 0.2201 (\u001b[32m↘ -0.0502\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0247\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.3811\n",
+      "    │   ├── Epoch N-1      = 0.417  (\u001b[32m↘ -0.036\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0104\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.2543\n",
+      "    │   ├── Epoch N-1      = 1.3446 (\u001b[32m↘ -0.0903\u001b[0m)\n",
+      "    │   └── Best until now = 1.3446 (\u001b[32m↘ -0.0903\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0325\n",
+      "    │   ├── Epoch N-1      = 0.0346 (\u001b[31m↘ -0.0021\u001b[0m)\n",
+      "    │   └── Best until now = 0.0346 (\u001b[31m↘ -0.0021\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9266\n",
+      "    │   ├── Epoch N-1      = 0.9408 (\u001b[31m↘ -0.0141\u001b[0m)\n",
+      "    │   └── Best until now = 0.9408 (\u001b[31m↘ -0.0141\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0628\n",
+      "    │   ├── Epoch N-1      = 0.0668 (\u001b[31m↘ -0.0039\u001b[0m)\n",
+      "    │   └── Best until now = 0.0668 (\u001b[31m↘ -0.0039\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.7\n",
+      "        ├── Epoch N-1      = 0.67   (↗ 0.03\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.67\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 19: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.83, PPYoloELoss/loss_cls=0.857, PPYoloELoss/loss_dfl=0.579, PPYoloELoss/loss_iou=0.39, gpu_mem=6.67]\n",
+      "Validating epoch 19: 100%|██████████| 2/2 [00:01<00:00,  1.78it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 19\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8565\n",
+      "│   │   ├── Epoch N-1      = 0.8588 (\u001b[32m↘ -0.0023\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8588 (\u001b[32m↘ -0.0023\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3895\n",
+      "│   │   ├── Epoch N-1      = 0.3755 (\u001b[31m↗ 0.014\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3755 (\u001b[31m↗ 0.014\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.579\n",
+      "│   │   ├── Epoch N-1      = 0.5686 (\u001b[31m↗ 0.0105\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5686 (\u001b[31m↗ 0.0105\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.8251\n",
+      "│       ├── Epoch N-1      = 1.8029 (\u001b[31m↗ 0.0222\u001b[0m)\n",
+      "│       └── Best until now = 1.8029 (\u001b[31m↗ 0.0222\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.686\n",
+      "    │   ├── Epoch N-1      = 0.7033 (\u001b[32m↘ -0.0173\u001b[0m)\n",
+      "    │   └── Best until now = 0.7033 (\u001b[32m↘ -0.0173\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.2\n",
+      "    │   ├── Epoch N-1      = 0.1699 (\u001b[31m↗ 0.03\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0548\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.392\n",
+      "    │   ├── Epoch N-1      = 0.3811 (\u001b[31m↗ 0.0109\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0214\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.2779\n",
+      "    │   ├── Epoch N-1      = 1.2543 (\u001b[31m↗ 0.0237\u001b[0m)\n",
+      "    │   └── Best until now = 1.2543 (\u001b[31m↗ 0.0237\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0303\n",
+      "    │   ├── Epoch N-1      = 0.0325 (\u001b[31m↘ -0.0021\u001b[0m)\n",
+      "    │   └── Best until now = 0.0346 (\u001b[31m↘ -0.0042\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9406\n",
+      "    │   ├── Epoch N-1      = 0.9266 (\u001b[32m↗ 0.0139\u001b[0m)\n",
+      "    │   └── Best until now = 0.9408 (\u001b[31m↘ -0.0002\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0588\n",
+      "    │   ├── Epoch N-1      = 0.0628 (\u001b[31m↘ -0.004\u001b[0m)\n",
+      "    │   └── Best until now = 0.0668 (\u001b[31m↘ -0.0079\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.6\n",
+      "        ├── Epoch N-1      = 0.7    (↘ -0.1\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.57\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 20: 100%|██████████| 31/31 [00:18<00:00,  1.64it/s, PPYoloELoss/loss=1.76, PPYoloELoss/loss_cls=0.83, PPYoloELoss/loss_dfl=0.566, PPYoloELoss/loss_iou=0.361, gpu_mem=6.71]\n",
+      "Validating epoch 20: 100%|██████████| 2/2 [00:01<00:00,  1.79it/s]\n",
+      "[2024-09-20 07:49:57] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:49:57] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9429059028625488\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 20\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8301\n",
+      "│   │   ├── Epoch N-1      = 0.8565 (\u001b[32m↘ -0.0264\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8565 (\u001b[32m↘ -0.0264\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3612\n",
+      "│   │   ├── Epoch N-1      = 0.3895 (\u001b[32m↘ -0.0283\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3755 (\u001b[32m↘ -0.0143\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.5662\n",
+      "│   │   ├── Epoch N-1      = 0.579  (\u001b[32m↘ -0.0129\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5686 (\u001b[32m↘ -0.0024\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.7575\n",
+      "│       ├── Epoch N-1      = 1.8251 (\u001b[32m↘ -0.0676\u001b[0m)\n",
+      "│       └── Best until now = 1.8029 (\u001b[32m↘ -0.0454\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.6557\n",
+      "    │   ├── Epoch N-1      = 0.686  (\u001b[32m↘ -0.0303\u001b[0m)\n",
+      "    │   └── Best until now = 0.686  (\u001b[32m↘ -0.0303\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1896\n",
+      "    │   ├── Epoch N-1      = 0.2    (\u001b[32m↘ -0.0104\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0444\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.3898\n",
+      "    │   ├── Epoch N-1      = 0.392  (\u001b[32m↘ -0.0022\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[31m↗ 0.0192\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.235\n",
+      "    │   ├── Epoch N-1      = 1.2779 (\u001b[32m↘ -0.0429\u001b[0m)\n",
+      "    │   └── Best until now = 1.2543 (\u001b[32m↘ -0.0193\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0392\n",
+      "    │   ├── Epoch N-1      = 0.0303 (\u001b[32m↗ 0.0089\u001b[0m)\n",
+      "    │   └── Best until now = 0.0346 (\u001b[32m↗ 0.0047\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9429\n",
+      "    │   ├── Epoch N-1      = 0.9406 (\u001b[32m↗ 0.0023\u001b[0m)\n",
+      "    │   └── Best until now = 0.9408 (\u001b[32m↗ 0.0021\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0754\n",
+      "    │   ├── Epoch N-1      = 0.0588 (\u001b[32m↗ 0.0166\u001b[0m)\n",
+      "    │   └── Best until now = 0.0668 (\u001b[32m↗ 0.0086\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.63\n",
+      "        ├── Epoch N-1      = 0.6    (↗ 0.03\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.6\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 21: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.75, PPYoloELoss/loss_cls=0.837, PPYoloELoss/loss_dfl=0.556, PPYoloELoss/loss_iou=0.358, gpu_mem=6.73]\n",
+      "Validating epoch 21: 100%|██████████| 2/2 [00:01<00:00,  1.78it/s]\n",
+      "[2024-09-20 07:50:36] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:50:36] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.94732666015625\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 21\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8373\n",
+      "│   │   ├── Epoch N-1      = 0.8301 (\u001b[31m↗ 0.0072\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8301 (\u001b[31m↗ 0.0072\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3584\n",
+      "│   │   ├── Epoch N-1      = 0.3612 (\u001b[32m↘ -0.0028\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3612 (\u001b[32m↘ -0.0028\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.5565\n",
+      "│   │   ├── Epoch N-1      = 0.5662 (\u001b[32m↘ -0.0097\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5662 (\u001b[32m↘ -0.0097\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.7522\n",
+      "│       ├── Epoch N-1      = 1.7575 (\u001b[32m↘ -0.0053\u001b[0m)\n",
+      "│       └── Best until now = 1.7575 (\u001b[32m↘ -0.0053\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.6685\n",
+      "    │   ├── Epoch N-1      = 0.6557 (\u001b[31m↗ 0.0129\u001b[0m)\n",
+      "    │   └── Best until now = 0.6557 (\u001b[31m↗ 0.0129\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1592\n",
+      "    │   ├── Epoch N-1      = 0.1896 (\u001b[32m↘ -0.0303\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0141\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.3644\n",
+      "    │   ├── Epoch N-1      = 0.3898 (\u001b[32m↘ -0.0254\u001b[0m)\n",
+      "    │   └── Best until now = 0.3706 (\u001b[32m↘ -0.0063\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.1921\n",
+      "    │   ├── Epoch N-1      = 1.235  (\u001b[32m↘ -0.0429\u001b[0m)\n",
+      "    │   └── Best until now = 1.235  (\u001b[32m↘ -0.0429\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0325\n",
+      "    │   ├── Epoch N-1      = 0.0392 (\u001b[31m↘ -0.0068\u001b[0m)\n",
+      "    │   └── Best until now = 0.0392 (\u001b[31m↘ -0.0068\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9473\n",
+      "    │   ├── Epoch N-1      = 0.9429 (\u001b[32m↗ 0.0044\u001b[0m)\n",
+      "    │   └── Best until now = 0.9429 (\u001b[32m↗ 0.0044\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0628\n",
+      "    │   ├── Epoch N-1      = 0.0754 (\u001b[31m↘ -0.0126\u001b[0m)\n",
+      "    │   └── Best until now = 0.0754 (\u001b[31m↘ -0.0126\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.49\n",
+      "        ├── Epoch N-1      = 0.63   (↘ -0.14\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.46\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 22: 100%|██████████| 31/31 [00:18<00:00,  1.65it/s, PPYoloELoss/loss=1.77, PPYoloELoss/loss_cls=0.841, PPYoloELoss/loss_dfl=0.563, PPYoloELoss/loss_iou=0.366, gpu_mem=6.84]\n",
+      "Validating epoch 22: 100%|██████████| 2/2 [00:01<00:00,  1.72it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 22\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8413\n",
+      "│   │   ├── Epoch N-1      = 0.8373 (\u001b[31m↗ 0.004\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8301 (\u001b[31m↗ 0.0112\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3655\n",
+      "│   │   ├── Epoch N-1      = 0.3584 (\u001b[31m↗ 0.0071\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3584 (\u001b[31m↗ 0.0071\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.5626\n",
+      "│   │   ├── Epoch N-1      = 0.5565 (\u001b[31m↗ 0.0062\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5565 (\u001b[31m↗ 0.0062\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.7695\n",
+      "│       ├── Epoch N-1      = 1.7522 (\u001b[31m↗ 0.0173\u001b[0m)\n",
+      "│       └── Best until now = 1.7522 (\u001b[31m↗ 0.0173\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.6986\n",
+      "    │   ├── Epoch N-1      = 0.6685 (\u001b[31m↗ 0.03\u001b[0m)\n",
+      "    │   └── Best until now = 0.6557 (\u001b[31m↗ 0.0429\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1545\n",
+      "    │   ├── Epoch N-1      = 0.1592 (\u001b[32m↘ -0.0047\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0093\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.357\n",
+      "    │   ├── Epoch N-1      = 0.3644 (\u001b[32m↘ -0.0073\u001b[0m)\n",
+      "    │   └── Best until now = 0.3644 (\u001b[32m↘ -0.0073\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.2101\n",
+      "    │   ├── Epoch N-1      = 1.1921 (\u001b[31m↗ 0.018\u001b[0m)\n",
+      "    │   └── Best until now = 1.1921 (\u001b[31m↗ 0.018\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0283\n",
+      "    │   ├── Epoch N-1      = 0.0325 (\u001b[31m↘ -0.0042\u001b[0m)\n",
+      "    │   └── Best until now = 0.0392 (\u001b[31m↘ -0.0109\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9473\n",
+      "    │   ├── Epoch N-1      = 0.9473 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9473 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.055\n",
+      "    │   ├── Epoch N-1      = 0.0628 (\u001b[31m↘ -0.0078\u001b[0m)\n",
+      "    │   └── Best until now = 0.0754 (\u001b[31m↘ -0.0204\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.83\n",
+      "        ├── Epoch N-1      = 0.49   (↗ 0.34\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.8\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 23: 100%|██████████| 31/31 [00:18<00:00,  1.64it/s, PPYoloELoss/loss=1.76, PPYoloELoss/loss_cls=0.832, PPYoloELoss/loss_dfl=0.557, PPYoloELoss/loss_iou=0.369, gpu_mem=6.81]\n",
+      "Validating epoch 23: 100%|██████████| 2/2 [00:01<00:00,  1.78it/s]\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 23\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8319\n",
+      "│   │   ├── Epoch N-1      = 0.8413 (\u001b[32m↘ -0.0094\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8301 (\u001b[31m↗ 0.0018\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3692\n",
+      "│   │   ├── Epoch N-1      = 0.3655 (\u001b[31m↗ 0.0037\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3584 (\u001b[31m↗ 0.0108\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.557\n",
+      "│   │   ├── Epoch N-1      = 0.5626 (\u001b[32m↘ -0.0056\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5565 (\u001b[31m↗ 0.0005\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.7581\n",
+      "│       ├── Epoch N-1      = 1.7695 (\u001b[32m↘ -0.0113\u001b[0m)\n",
+      "│       └── Best until now = 1.7522 (\u001b[31m↗ 0.0059\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.6772\n",
+      "    │   ├── Epoch N-1      = 0.6986 (\u001b[32m↘ -0.0214\u001b[0m)\n",
+      "    │   └── Best until now = 0.6557 (\u001b[31m↗ 0.0215\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1708\n",
+      "    │   ├── Epoch N-1      = 0.1545 (\u001b[31m↗ 0.0162\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.0256\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.3614\n",
+      "    │   ├── Epoch N-1      = 0.357  (\u001b[31m↗ 0.0044\u001b[0m)\n",
+      "    │   └── Best until now = 0.357  (\u001b[31m↗ 0.0044\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.2094\n",
+      "    │   ├── Epoch N-1      = 1.2101 (\u001b[32m↘ -0.0007\u001b[0m)\n",
+      "    │   └── Best until now = 1.1921 (\u001b[31m↗ 0.0173\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.031\n",
+      "    │   ├── Epoch N-1      = 0.0283 (\u001b[32m↗ 0.0026\u001b[0m)\n",
+      "    │   └── Best until now = 0.0392 (\u001b[31m↘ -0.0083\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9473\n",
+      "    │   ├── Epoch N-1      = 0.9473 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9473 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.06\n",
+      "    │   ├── Epoch N-1      = 0.055  (\u001b[32m↗ 0.0049\u001b[0m)\n",
+      "    │   └── Best until now = 0.0754 (\u001b[31m↘ -0.0154\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.72\n",
+      "        ├── Epoch N-1      = 0.83   (↘ -0.11\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.69\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Train epoch 24: 100%|██████████| 31/31 [00:18<00:00,  1.66it/s, PPYoloELoss/loss=1.73, PPYoloELoss/loss_cls=0.818, PPYoloELoss/loss_dfl=0.551, PPYoloELoss/loss_iou=0.358, gpu_mem=6.76]\n",
+      "Validating epoch 24: 100%|██████████| 2/2 [00:01<00:00,  1.74it/s]\n",
+      "[2024-09-20 07:52:36] INFO - base_sg_logger.py - Checkpoint saved in /kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth\n",
+      "[2024-09-20 07:52:36] INFO - sg_trainer.py - Best checkpoint overriden: validation mAP@0.50: 0.9488449096679688\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "===========================================================\n",
+      "SUMMARY OF EPOCH 24\n",
+      "├── Train\n",
+      "│   ├── Ppyoloeloss/loss_cls = 0.8176\n",
+      "│   │   ├── Epoch N-1      = 0.8319 (\u001b[32m↘ -0.0143\u001b[0m)\n",
+      "│   │   └── Best until now = 0.8301 (\u001b[32m↘ -0.0125\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_iou = 0.3577\n",
+      "│   │   ├── Epoch N-1      = 0.3692 (\u001b[32m↘ -0.0115\u001b[0m)\n",
+      "│   │   └── Best until now = 0.3584 (\u001b[32m↘ -0.0007\u001b[0m)\n",
+      "│   ├── Ppyoloeloss/loss_dfl = 0.5506\n",
+      "│   │   ├── Epoch N-1      = 0.557  (\u001b[32m↘ -0.0064\u001b[0m)\n",
+      "│   │   └── Best until now = 0.5565 (\u001b[32m↘ -0.0059\u001b[0m)\n",
+      "│   └── Ppyoloeloss/loss = 1.7259\n",
+      "│       ├── Epoch N-1      = 1.7581 (\u001b[32m↘ -0.0322\u001b[0m)\n",
+      "│       └── Best until now = 1.7522 (\u001b[32m↘ -0.0262\u001b[0m)\n",
+      "└── Validation\n",
+      "    ├── Ppyoloeloss/loss_cls = 0.6416\n",
+      "    │   ├── Epoch N-1      = 0.6772 (\u001b[32m↘ -0.0356\u001b[0m)\n",
+      "    │   └── Best until now = 0.6557 (\u001b[32m↘ -0.0141\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_iou = 0.1592\n",
+      "    │   ├── Epoch N-1      = 0.1708 (\u001b[32m↘ -0.0115\u001b[0m)\n",
+      "    │   └── Best until now = 0.1452 (\u001b[31m↗ 0.014\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss_dfl = 0.3523\n",
+      "    │   ├── Epoch N-1      = 0.3614 (\u001b[32m↘ -0.0091\u001b[0m)\n",
+      "    │   └── Best until now = 0.357  (\u001b[32m↘ -0.0047\u001b[0m)\n",
+      "    ├── Ppyoloeloss/loss = 1.1531\n",
+      "    │   ├── Epoch N-1      = 1.2094 (\u001b[32m↘ -0.0563\u001b[0m)\n",
+      "    │   └── Best until now = 1.1921 (\u001b[32m↘ -0.039\u001b[0m)\n",
+      "    ├── Precision@0.50 = 0.0343\n",
+      "    │   ├── Epoch N-1      = 0.031  (\u001b[32m↗ 0.0033\u001b[0m)\n",
+      "    │   └── Best until now = 0.0392 (\u001b[31m↘ -0.005\u001b[0m)\n",
+      "    ├── Recall@0.50 = 0.9583\n",
+      "    │   ├── Epoch N-1      = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    │   └── Best until now = 0.9583 (\u001b[37m= 0.0\u001b[0m)\n",
+      "    ├── Map@0.50 = 0.9488\n",
+      "    │   ├── Epoch N-1      = 0.9473 (\u001b[32m↗ 0.0015\u001b[0m)\n",
+      "    │   └── Best until now = 0.9473 (\u001b[32m↗ 0.0015\u001b[0m)\n",
+      "    ├── F1@0.50 = 0.0662\n",
+      "    │   ├── Epoch N-1      = 0.06   (\u001b[32m↗ 0.0062\u001b[0m)\n",
+      "    │   └── Best until now = 0.0754 (\u001b[31m↘ -0.0092\u001b[0m)\n",
+      "    └── Best_score_threshold = 0.66\n",
+      "        ├── Epoch N-1      = 0.72   (↘ -0.06\u001b[0m)\n",
+      "        └── Best until now = 0.03   (↗ 0.63\u001b[0m)\n",
+      "\n",
+      "===========================================================\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[2024-09-20 07:52:52] INFO - sg_trainer.py - RUNNING ADDITIONAL TEST ON THE AVERAGED MODEL...\n",
+      "You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.\n",
+      "Validating epoch 25: 100%|██████████| 2/2 [00:01<00:00,  1.62it/s]\n"
+     ]
+    }
+   ],
+   "source": [
+    "trainer.train(\n",
+    "    model=model,\n",
+    "    training_params=train_params,\n",
+    "    train_loader=train_data,\n",
+    "    valid_loader=val_data\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5419eb4c",
+   "metadata": {
+    "id": "SiMFjRokll6q",
+    "papermill": {
+     "duration": 0.091722,
+     "end_time": "2024-09-20T07:52:54.718185",
+     "exception": false,
+     "start_time": "2024-09-20T07:52:54.626463",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Analyze training metrics\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "ac3f48d0",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:52:54.908995Z",
+     "iopub.status.busy": "2024-09-20T07:52:54.908580Z",
+     "iopub.status.idle": "2024-09-20T07:52:54.911180Z",
+     "shell.execute_reply": "2024-09-20T07:52:54.910875Z"
+    },
+    "id": "LRZ6qtaca9_w",
+    "outputId": "6ceb585e-be9c-4652-919a-e20d6e6d8164",
+    "papermill": {
+     "duration": 0.099338,
+     "end_time": "2024-09-20T07:52:54.913531",
+     "exception": false,
+     "start_time": "2024-09-20T07:52:54.814193",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# %load_ext tensorboard\n",
+    "# %tensorboard --logdir {CHECKPOINT_DIR}/{EXPERIMENT_NAME}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "402aa0cc",
+   "metadata": {
+    "id": "U2Zm_JWRcIcp",
+    "papermill": {
+     "duration": 0.091803,
+     "end_time": "2024-09-20T07:52:55.101721",
+     "exception": false,
+     "start_time": "2024-09-20T07:52:55.009918",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Zip and download fine-tuned model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "090718b4",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:52:55.290724Z",
+     "iopub.status.busy": "2024-09-20T07:52:55.289989Z",
+     "iopub.status.idle": "2024-09-20T07:54:42.958551Z",
+     "shell.execute_reply": "2024-09-20T07:54:42.957865Z"
+    },
+    "id": "AicLyuZBcLx3",
+    "papermill": {
+     "duration": 107.764791,
+     "end_time": "2024-09-20T07:54:42.961050",
+     "exception": false,
+     "start_time": "2024-09-20T07:52:55.196259",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "  adding: kaggle/working/checkpoints/fighter_jet/ (stored 0%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ (stored 0%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/events.out.tfevents.1726818774.be7b5e0e7393.22.1 (deflated 9%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/logs_Sep20_07_36_31.txt (deflated 79%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/experiment_logs_Sep20_07_36_31.txt (deflated 75%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_best.pth (deflated 8%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/average_model.pth (deflated 8%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/console_Sep20_07_36_31.txt (deflated 93%)\r\n",
+      "  adding: kaggle/working/checkpoints/fighter_jet/RUN_20240920_073631_287173/ckpt_latest.pth"
+     ]
+    }
+   ],
+   "source": [
+    "!zip -r yolo_nas.zip {CHECKPOINT_DIR}/{EXPERIMENT_NAME}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "id": "ed3a76b7",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:43.145786Z",
+     "iopub.status.busy": "2024-09-20T07:54:43.145365Z",
+     "iopub.status.idle": "2024-09-20T07:54:43.148289Z",
+     "shell.execute_reply": "2024-09-20T07:54:43.147903Z"
+    },
+    "id": "wM3pdH3NdF2L",
+    "papermill": {
+     "duration": 0.097522,
+     "end_time": "2024-09-20T07:54:43.150628",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:43.053106",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# if you experience 'NotImplementedError: A UTF-8 locale is required. Got ANSI_X3.4-1968' error, run code below 👇\n",
+    "\n",
+    "# import locale\n",
+    "# locale.getpreferredencoding = lambda: \"UTF-8\""
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b605d508",
+   "metadata": {
+    "id": "o0Lkok3TKueg",
+    "papermill": {
+     "duration": 0.089926,
+     "end_time": "2024-09-20T07:54:43.331046",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:43.241120",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Load trained model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "id": "77319cd9",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:43.515512Z",
+     "iopub.status.busy": "2024-09-20T07:54:43.515174Z",
+     "iopub.status.idle": "2024-09-20T07:54:43.517401Z",
+     "shell.execute_reply": "2024-09-20T07:54:43.517091Z"
+    },
+    "id": "Al1R2UQ5y5tk",
+    "outputId": "f63f949c-9eda-4c5c-c1df-2375c48fd149",
+    "papermill": {
+     "duration": 0.098234,
+     "end_time": "2024-09-20T07:54:43.519661",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:43.421427",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# best_model = models.get(\n",
+    "#     MODEL_ARCH,\n",
+    "#     num_classes=len(dataset_params['classes']),\n",
+    "#     checkpoint_path=f\"{CHECKPOINT_DIR}/{EXPERIMENT_NAME}/average_model.pth\"\n",
+    "# ).to(DEVICE)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5ac05397",
+   "metadata": {
+    "id": "kCLMU8PEKzvf",
+    "papermill": {
+     "duration": 0.090643,
+     "end_time": "2024-09-20T07:54:43.703166",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:43.612523",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "## Evaluate trained model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "id": "26cd25ac",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:43.886020Z",
+     "iopub.status.busy": "2024-09-20T07:54:43.885624Z",
+     "iopub.status.idle": "2024-09-20T07:54:43.888508Z",
+     "shell.execute_reply": "2024-09-20T07:54:43.888214Z"
+    },
+    "id": "figss_6TJvAj",
+    "outputId": "e7f06168-d892-4ea6-f9b6-36e71002eff2",
+    "papermill": {
+     "duration": 0.096936,
+     "end_time": "2024-09-20T07:54:43.890927",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:43.793991",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# trainer.test(\n",
+    "#     model=best_model,\n",
+    "#     test_loader=test_data,\n",
+    "#     test_metrics_list=DetectionMetrics_050(\n",
+    "#         score_thres=0.1,\n",
+    "#         top_k_predictions=300,\n",
+    "#         num_cls=len(dataset_params['classes']),\n",
+    "#         normalize_targets=True,\n",
+    "#         post_prediction_callback=PPYoloEPostPredictionCallback(\n",
+    "#             score_threshold=0.01,\n",
+    "#             nms_top_k=1000,\n",
+    "#             max_predictions=300,\n",
+    "#             nms_threshold=0.7\n",
+    "#         )\n",
+    "#     )\n",
+    "# )"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cc984be1",
+   "metadata": {
+    "id": "dT7YKnrWLC04",
+    "papermill": {
+     "duration": 0.091573,
+     "end_time": "2024-09-20T07:54:44.074688",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:43.983115",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Inference with trained model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "07271c60",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:44.264885Z",
+     "iopub.status.busy": "2024-09-20T07:54:44.264401Z",
+     "iopub.status.idle": "2024-09-20T07:54:44.267149Z",
+     "shell.execute_reply": "2024-09-20T07:54:44.266840Z"
+    },
+    "id": "SF5tGXtHeYS9",
+    "papermill": {
+     "duration": 0.103743,
+     "end_time": "2024-09-20T07:54:44.269522",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:44.165779",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import supervision as sv\n",
+    "\n",
+    "# ds = sv.DetectionDataset.from_yolo(\n",
+    "#     images_directory_path=f\"{dataset.location}/test/images\",\n",
+    "#     annotations_directory_path=f\"{dataset.location}/test/labels\",\n",
+    "#     data_yaml_path=f\"{dataset.location}/data.yaml\",\n",
+    "#     force_masks=False\n",
+    "# )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "0e7cca2b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:44.459273Z",
+     "iopub.status.busy": "2024-09-20T07:54:44.458272Z",
+     "iopub.status.idle": "2024-09-20T07:54:44.461438Z",
+     "shell.execute_reply": "2024-09-20T07:54:44.461151Z"
+    },
+    "id": "iqBcOUVuj3hc",
+    "papermill": {
+     "duration": 0.099557,
+     "end_time": "2024-09-20T07:54:44.463459",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:44.363902",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import supervision as sv\n",
+    "\n",
+    "# CONFIDENCE_TRESHOLD = 0.5\n",
+    "\n",
+    "# predictions = {}\n",
+    "\n",
+    "# for image_name, image in ds.images.items():\n",
+    "#     result = list(best_model.predict(image, conf=CONFIDENCE_TRESHOLD))[0]\n",
+    "#     detections = sv.Detections(\n",
+    "#         xyxy=result.prediction.bboxes_xyxy,\n",
+    "#         confidence=result.prediction.confidence,\n",
+    "#         class_id=result.prediction.labels.astype(int)\n",
+    "#     )\n",
+    "#     predictions[image_name] = detections"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "978cd70d",
+   "metadata": {
+    "id": "qcQekcPllPoM",
+    "papermill": {
+     "duration": 0.090586,
+     "end_time": "2024-09-20T07:54:44.647020",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:44.556434",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Visualize inference results"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "id": "598a1152",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:44.839106Z",
+     "iopub.status.busy": "2024-09-20T07:54:44.838500Z",
+     "iopub.status.idle": "2024-09-20T07:54:44.840879Z",
+     "shell.execute_reply": "2024-09-20T07:54:44.840580Z"
+    },
+    "id": "qsAWCA0Bm9hH",
+    "papermill": {
+     "duration": 0.102489,
+     "end_time": "2024-09-20T07:54:44.843271",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:44.740782",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import random\n",
+    "# random.seed(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "id": "83159dac",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:45.029724Z",
+     "iopub.status.busy": "2024-09-20T07:54:45.029400Z",
+     "iopub.status.idle": "2024-09-20T07:54:45.032535Z",
+     "shell.execute_reply": "2024-09-20T07:54:45.032164Z"
+    },
+    "id": "e60g6GtxmMRA",
+    "outputId": "1aa2acf3-ca8d-4a53-e59c-dadc9c22c40a",
+    "papermill": {
+     "duration": 0.09782,
+     "end_time": "2024-09-20T07:54:45.034797",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:44.936977",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import supervision as sv\n",
+    "\n",
+    "# MAX_IMAGE_COUNT = 5\n",
+    "\n",
+    "# n = min(MAX_IMAGE_COUNT, len(ds.images))\n",
+    "\n",
+    "# keys = list(ds.images.keys())\n",
+    "# keys = random.sample(keys, n)\n",
+    "\n",
+    "# box_annotator = sv.BoxAnnotator()\n",
+    "\n",
+    "# images = []\n",
+    "# titles = []\n",
+    "\n",
+    "# for key in keys:\n",
+    "#     frame_with_annotations = box_annotator.annotate(\n",
+    "#         scene=ds.images[key].copy(),\n",
+    "#         detections=ds.annotations[key],\n",
+    "#         skip_label=True\n",
+    "#     )\n",
+    "#     images.append(frame_with_annotations)\n",
+    "#     titles.append('annotations')\n",
+    "#     frame_with_predictions = box_annotator.annotate(\n",
+    "#         scene=ds.images[key].copy(),\n",
+    "#         detections=predictions[key],\n",
+    "#         skip_label=True\n",
+    "#     )\n",
+    "#     images.append(frame_with_predictions)\n",
+    "#     titles.append('predictions')\n",
+    "\n",
+    "# %matplotlib inline\n",
+    "# sv.plot_images_grid(images=images, titles=titles, grid_size=(n, 2), size=(2 * 4, n * 4))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6ecfddd2",
+   "metadata": {
+    "id": "tmMIOT2hsM1F",
+    "papermill": {
+     "duration": 0.090481,
+     "end_time": "2024-09-20T07:54:45.215709",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:45.125228",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "### Calculate confusion matrix"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "id": "c9e9cde1",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:45.399599Z",
+     "iopub.status.busy": "2024-09-20T07:54:45.399270Z",
+     "iopub.status.idle": "2024-09-20T07:54:45.401575Z",
+     "shell.execute_reply": "2024-09-20T07:54:45.401192Z"
+    },
+    "id": "6mSapibasSst",
+    "papermill": {
+     "duration": 0.097626,
+     "end_time": "2024-09-20T07:54:45.404126",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:45.306500",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# !pip install onemetric"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "id": "94430389",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-09-20T07:54:45.590480Z",
+     "iopub.status.busy": "2024-09-20T07:54:45.590174Z",
+     "iopub.status.idle": "2024-09-20T07:54:45.593520Z",
+     "shell.execute_reply": "2024-09-20T07:54:45.593143Z"
+    },
+    "id": "r6en9Qxcs9Yy",
+    "outputId": "fafdf0fe-68b8-45a5-e5e2-d8e050006919",
+    "papermill": {
+     "duration": 0.100936,
+     "end_time": "2024-09-20T07:54:45.595929",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:45.494993",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "# import os\n",
+    "\n",
+    "# import numpy as np\n",
+    "\n",
+    "# from onemetric.cv.object_detection import ConfusionMatrix\n",
+    "\n",
+    "# keys = list(ds.images.keys())\n",
+    "\n",
+    "# annotation_batches, prediction_batches = [], []\n",
+    "\n",
+    "# for key in keys:\n",
+    "#     annotation=ds.annotations[key]\n",
+    "#     annotation_batch = np.column_stack((\n",
+    "#         annotation.xyxy,\n",
+    "#         annotation.class_id\n",
+    "#     ))\n",
+    "#     annotation_batches.append(annotation_batch)\n",
+    "\n",
+    "#     prediction=predictions[key]\n",
+    "#     prediction_batch = np.column_stack((\n",
+    "#         prediction.xyxy,\n",
+    "#         prediction.class_id,\n",
+    "#         prediction.confidence\n",
+    "#     ))\n",
+    "#     prediction_batches.append(prediction_batch)\n",
+    "\n",
+    "# confusion_matrix = ConfusionMatrix.from_detections(\n",
+    "#     true_batches=annotation_batches,\n",
+    "#     detection_batches=prediction_batches,\n",
+    "#     num_classes=len(ds.classes),\n",
+    "#     conf_threshold=CONFIDENCE_TRESHOLD\n",
+    "# )\n",
+    "\n",
+    "# confusion_matrix.plot(os.path.join(HOME, \"confusion_matrix.png\"), class_names=ds.classes)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "937bae64",
+   "metadata": {
+    "id": "3gRA9UQo5jd0",
+    "papermill": {
+     "duration": 0.090219,
+     "end_time": "2024-09-20T07:54:45.777182",
+     "exception": false,
+     "start_time": "2024-09-20T07:54:45.686963",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "  # 🏆 Congratulations\n",
+    "\n",
+    "### Learning Resources\n",
+    "\n",
+    "Roboflow has produced many resources that you may find interesting as you advance your knowledge of computer vision:\n",
+    "\n",
+    "- [Roboflow Notebooks](https://github.com/roboflow/notebooks): A repository of over 20 notebooks that walk through how to train custom models with a range of model types, from YOLOv7 to SegFormer.\n",
+    "- [Roboflow YouTube](https://www.youtube.com/c/Roboflow): Our library of videos featuring deep dives into the latest in computer vision, detailed tutorials that accompany our notebooks, and more.\n",
+    "- [Roboflow Discuss](https://discuss.roboflow.com/): Have a question about how to do something on Roboflow? Ask your question on our discussion forum.\n",
+    "- [Roboflow Models](https://roboflow.com): Learn about state-of-the-art models and their performance. Find links and tutorials to guide your learning.\n",
+    "\n",
+    "### Convert data formats\n",
+    "\n",
+    "Roboflow provides free utilities to convert data between dozens of popular computer vision formats. Check out [Roboflow Formats](https://roboflow.com/formats) to find tutorials on how to convert data between formats in a few clicks.\n",
+    "\n",
+    "### Connect computer vision to your project logic\n",
+    "\n",
+    "[Roboflow Templates](https://roboflow.com/templates) is a public gallery of code snippets that you can use to connect computer vision to your project logic. Code snippets range from sending emails after inference to measuring object distance between detections."
+   ]
+  }
+ ],
+ "metadata": {
+  "accelerator": "GPU",
+  "colab": {
+   "gpuType": "T4",
+   "provenance": []
+  },
+  "gpuClass": "standard",
+  "kaggle": {
+   "accelerator": "nvidiaTeslaT4",
+   "dataSources": [],
+   "dockerImageVersionId": 30762,
+   "isGpuEnabled": true,
+   "isInternetEnabled": true,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.14"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 1285.151619,
+   "end_time": "2024-09-20T07:54:49.548216",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2024-09-20T07:33:24.396597",
+   "version": "2.6.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
